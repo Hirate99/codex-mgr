@@ -41,7 +41,7 @@ function seed(): void {
     const imported = importCodexConfig();
     registry.upsert({
       id: "official",
-      label: "官方 OpenAI",
+      label: "Official OpenAI",
       home: defaultCodexHome(),
       model: imported.model ?? "gpt-5.6-sol",
       preferredAuthMethod: "chatgpt",
@@ -142,8 +142,8 @@ api.post("/api/adapters/opencodex/start", async (c) => {
     type: "adapter",
     level: result.running ? "info" : "error",
     message: result.running
-      ? `OpenCodex 已就绪（pid ${result.pid ?? "unknown"}）`
-      : `OpenCodex 启动失败：${result.error ?? "unknown"}`,
+      ? `OpenCodex ready (pid ${result.pid ?? "unknown"})`
+      : `Failed to start OpenCodex: ${result.error ?? "unknown"}`,
     detail: { ...result },
   });
   return c.json(result, result.running ? 200 : 409);
@@ -154,7 +154,7 @@ api.post("/api/adapters/opencodex/stop", async (c) => {
   recordActivity({
     type: "adapter",
     level: result.ok ? "info" : "error",
-    message: result.ok ? "OpenCodex 已停止" : `OpenCodex 停止失败：${result.error}`,
+    message: result.ok ? "OpenCodex stopped" : `Failed to stop OpenCodex: ${result.error}`,
   });
   return c.json(result, result.ok ? 200 : 500);
 });
@@ -184,7 +184,7 @@ api.get("/api/instances", (c) => {
 
 api.get("/api/instances/:id/activity", (c) => {
   const instance = registry.get(c.req.param("id"));
-  if (!instance) return c.json({ error: "实例不存在" }, 404);
+  if (!instance) return c.json({ error: "Instance not found" }, 404);
   return c.json({ events: listActivity(instance.id).slice(0, 50) });
 });
 
@@ -228,7 +228,7 @@ api.post("/api/models/custom", async (c) => {
   return c.json({
     source: "none",
     models: [],
-    error: "自定义 provider：填写 API key 后可直接探测 /models",
+    error: "Custom provider: fill in the API key to probe /models directly",
   });
 });
 
@@ -254,12 +254,12 @@ interface CreateBody {
 api.post("/api/instances", async (c) => {
   const body = (await c.req.json()) as CreateBody;
   const id = (body.id ?? body.label ?? "").trim().replace(/[^\w.-]+/g, "-").toLowerCase();
-  if (!id) return c.json({ error: "缺少 id 或 label" }, 400);
-  if (registry.get(id)) return c.json({ error: `实例 ${id} 已存在` }, 409);
-  if (reservedInstanceIds.has(id)) return c.json({ error: `${id} 是保留实例 ID` }, 409);
+  if (!id) return c.json({ error: "Missing id or label" }, 400);
+  if (registry.get(id)) return c.json({ error: `Instance ${id} already exists` }, 409);
+  if (reservedInstanceIds.has(id)) return c.json({ error: `${id} is a reserved instance ID` }, 409);
   if (existsSync(instanceHome(id))) {
     return c.json(
-      { error: `实例目录已存在：${instanceHome(id)}。请使用其他 ID，或先删除/导入该目录` },
+      { error: `Instance directory already exists: ${instanceHome(id)}. Use another ID, or delete/import that directory first` },
       409,
     );
   }
@@ -269,7 +269,7 @@ api.post("/api/instances", async (c) => {
   if (body.official) {
     const instance: Instance = {
       id,
-      label: body.label ?? "官方 OpenAI",
+      label: body.label ?? "Official OpenAI",
       home: defaultCodexHome(),
       model: body.model ?? imported.model ?? "gpt-5.6-sol",
       preferredAuthMethod: "chatgpt",
@@ -288,16 +288,16 @@ api.post("/api/instances", async (c) => {
     if (providedKey) {
       setSecret(envKey, providedKey);
       secrets = loadSecrets();
-      secretNote = `API key 已更新 .env (${envKey})`;
+      secretNote = `API key updated in .env (${envKey})`;
     } else if (!secrets[envKey]) {
       const opencodeKey =
         opencodeKeyFor(preset?.id ?? "") ?? opencodeKeyFor(body.providerPreset ?? "");
       if (opencodeKey) {
         setSecret(envKey, opencodeKey);
         secrets = loadSecrets();
-        secretNote = `已自动从 opencode auth.json 导入 ${envKey}`;
+        secretNote = `Imported ${envKey} from opencode auth.json`;
       } else {
-        secretNote = `警告：未配置 ${envKey}，桌面客户端会回退到登录界面`;
+        secretNote = `Warning: ${envKey} is not configured; the desktop app will fall back to the sign-in screen`;
       }
     }
   }
@@ -312,7 +312,7 @@ api.post("/api/instances", async (c) => {
         {
           error:
             adapter.error ??
-            "OpenCodex 未运行，请检查项目依赖和本地端口 10100",
+            "OpenCodex is not running; check the project dependencies and local port 10100",
           adapter,
         },
         409,
@@ -325,7 +325,7 @@ api.post("/api/instances", async (c) => {
         apiKey: envKey ? secrets[envKey] : undefined,
         defaultModel: body.model,
       });
-      if (!configured.ok) return c.json({ error: configured.error ?? "OpenCodex provider 配置失败" }, 409);
+      if (!configured.ok) return c.json({ error: configured.error ?? "Failed to configure OpenCodex provider" }, 409);
     }
   }
 
@@ -346,11 +346,11 @@ api.post("/api/instances", async (c) => {
       : body.models;
   const model = models?.[0] ?? body.model ?? preset?.defaultModel;
   if (liveDeepSeekModels?.models.length) {
-    secretNote = `${secretNote ? `${secretNote}；` : ""}DeepSeek 模型目录已从 /models 同步`;
+    secretNote = `${secretNote ? `${secretNote}; ` : ""}DeepSeek model catalog synced from /models`;
   } else if (body.providerPreset === "deepseek" && activeApiKey) {
-    secretNote = `${secretNote ? `${secretNote}；` : ""}DeepSeek /models 探测失败，使用内置目录`;
+    secretNote = `${secretNote ? `${secretNote}; ` : ""}DeepSeek /models probe failed; using the built-in catalog`;
   }
-  if (!model) return c.json({ error: "缺少模型" }, 400);
+  if (!model) return c.json({ error: "Missing model" }, 400);
 
   try {
     const out = createInstance(
@@ -377,7 +377,7 @@ api.post("/api/instances", async (c) => {
       type: "create",
       level: out.warnings.length ? "warn" : "info",
       instanceId: id,
-      message: `实例已创建，${out.changes.length} 处配置变更`,
+      message: `Instance created with ${out.changes.length} config change(s)`,
       detail: { changes: out.changes, warnings: out.warnings, secretNote },
     });
     return c.json(
@@ -385,15 +385,15 @@ api.post("/api/instances", async (c) => {
       201,
     );
   } catch (e: any) {
-    return c.json({ error: e?.message ?? "创建失败" }, 500);
+    return c.json({ error: e?.message ?? "Create failed" }, 500);
   }
 });
 
 api.post("/api/instances/:id/switch-model", async (c) => {
   const instance = registry.get(c.req.param("id"));
-  if (!instance) return c.json({ error: "实例不存在" }, 404);
+  if (!instance) return c.json({ error: "Instance not found" }, 404);
   const body = (await c.req.json()) as { model?: string };
-  if (!body.model) return c.json({ error: "缺少 model" }, 400);
+  if (!body.model) return c.json({ error: "Missing model" }, 400);
   try {
     const r = switchInstanceModel(instance, body.model);
     instance.model = body.model;
@@ -402,30 +402,30 @@ api.post("/api/instances/:id/switch-model", async (c) => {
       type: "switch-model",
       level: r.warnings.length ? "warn" : "info",
       instanceId: instance.id,
-      message: `模型已切换到 ${body.model}`,
+      message: `Model switched to ${body.model}`,
       detail: { changes: r.changes, warnings: r.warnings },
     });
     return c.json({ changes: r.changes, warnings: r.warnings });
   } catch (e: any) {
-    return c.json({ error: e?.message ?? "切换失败" }, 500);
+    return c.json({ error: e?.message ?? "Switch failed" }, 500);
   }
 });
 
 api.post("/api/instances/:id/launch", async (c) => {
   const instance = registry.get(c.req.param("id"));
-  if (!instance) return c.json({ error: "实例不存在" }, 404);
+  if (!instance) return c.json({ error: "Instance not found" }, 404);
   const body = (await c.req.json().catch(() => ({}))) as { surface?: Surface };
   const surface = body.surface ?? "desktop";
   const key = instance.provider?.envKey;
   if (surface === "desktop" && key && !secrets[key]) {
     return c.json(
-      { error: `缺少 ${key}（~/.codex-mgr/.env 未配置），桌面客户端会退回登录界面；请先在面板填写 API key` },
+      { error: `Missing ${key} (~/.codex-mgr/.env not configured); the desktop app will fall back to the sign-in screen. Set the API key in the panel first` },
       409,
     );
   }
   const runtime = resolveInstanceRuntime(instance);
   if (runtime.processes.some((process) => process.surface === surface && !process.stale && process.pid > 0)) {
-    return c.json({ error: `实例已在该 surface 运行`, runtime }, 409);
+    return c.json({ error: `Instance is already running on this surface`, runtime }, 409);
   }
   registry.deleteProc(instance.id, surface);
   try {
@@ -435,7 +435,7 @@ api.post("/api/instances/:id/launch", async (c) => {
       type: "launch",
       level: "info",
       instanceId: instance.id,
-      message: `${surface === "desktop" ? "桌面客户端" : "Codex CLI"} 已启动（pid ${proc.pid}）`,
+      message: `${surface === "desktop" ? "Desktop app" : "Codex CLI"} started (pid ${proc.pid})`,
       detail: { surface, pid: proc.pid, fingerprint: proc.fingerprint },
     });
     return c.json(proc, 201);
@@ -444,15 +444,15 @@ api.post("/api/instances/:id/launch", async (c) => {
       type: "error",
       level: "error",
       instanceId: instance.id,
-      message: `启动 ${surface} 失败：${e?.message ?? "unknown"}`,
+      message: `Failed to start ${surface}: ${e?.message ?? "unknown"}`,
     });
-    return c.json({ error: e?.message ?? "启动失败" }, 500);
+    return c.json({ error: e?.message ?? "Start failed" }, 500);
   }
 });
 
 api.post("/api/instances/:id/stop", async (c) => {
   const instance = registry.get(c.req.param("id"));
-  if (!instance) return c.json({ error: "实例不存在" }, 404);
+  if (!instance) return c.json({ error: "Instance not found" }, 404);
   const body = (await c.req.json().catch(() => ({}))) as { surface?: Surface };
   const surface = body.surface ?? "desktop";
   const result = stopInstanceProcesses(instance, surface);
@@ -463,16 +463,16 @@ api.post("/api/instances/:id/stop", async (c) => {
     level: ok ? "info" : "error",
     instanceId: instance.id,
     message: ok
-      ? `${surface} 已停止（pid ${result.killed.join(", ")}）`
-      : `停止 ${surface} 失败（killed=${result.killed.join(", ") || "none"}, failed=${result.failed.join(", ") || "none"}）`,
+      ? `${surface} stopped (pid ${result.killed.join(", ")})`
+      : `Failed to stop ${surface} (killed=${result.killed.join(", ") || "none"}, failed=${result.failed.join(", ") || "none"})`,
     detail: { ...result },
   });
   if (!ok) {
     return c.json(
       {
         error: result.killed.length > 0
-          ? `部分进程已停止，但 pid ${result.failed.join(", ")} 停止失败`
-          : `未找到可停止的 ${surface} 进程`,
+          ? `Some processes were stopped, but pid ${result.failed.join(", ")} failed to stop`
+          : `No running ${surface} process found to stop`,
         ...result,
       },
       result.killed.length > 0 ? 500 : 404,
@@ -483,9 +483,9 @@ api.post("/api/instances/:id/stop", async (c) => {
 
 api.delete("/api/instances/:id", (c) => {
   const instance = registry.get(c.req.param("id"));
-  if (!instance) return c.json({ error: "实例不存在" }, 404);
+  if (!instance) return c.json({ error: "Instance not found" }, 404);
   if (isOfficial(instance)) {
-    return c.json({ error: "官方实例不可删除（共享已登录客户端与 ~/.codex）" }, 403);
+    return c.json({ error: "The official instance cannot be deleted (it shares the signed-in app and ~/.codex)" }, 403);
   }
   stopInstanceProcesses(instance, "desktop");
   stopInstanceProcesses(instance, "cli");
@@ -514,14 +514,14 @@ api.delete("/api/instances/:id", (c) => {
     type: "delete",
     level: "info",
     instanceId: instance.id,
-    message: `实例已删除${removedFiles ? "及其实例目录" : ""}${removedSecret ? "，并清理 API key" : ""}`,
+    message: `Instance deleted${removedFiles ? " along with its directory" : ""}${removedSecret ? " and the API key was cleaned up" : ""}`,
   });
   return c.json({ ok: true, removedFiles, removedSecret });
 });
 
 api.post("/api/secrets", async (c) => {
   const body = (await c.req.json()) as { key?: string; value?: string };
-  if (!body.key) return c.json({ error: "缺少 key" }, 400);
+  if (!body.key) return c.json({ error: "Missing key" }, 400);
   setSecret(body.key, body.value ?? "");
   secrets = loadSecrets();
   return c.json({ ok: true });

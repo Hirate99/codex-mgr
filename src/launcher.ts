@@ -74,7 +74,7 @@ export function launchDesktop(
   secrets: Record<string, string>,
 ): RunningProc {
   const app = target.desktopAppPath;
-  if (!app) throw new Error("未找到 ChatGPT/Codex 桌面客户端");
+  if (!app) throw new Error("ChatGPT/Codex desktop app not found");
 
   const args: string[] = [];
   if (instance.profile) {
@@ -106,7 +106,7 @@ export function launchCli(
   secrets: Record<string, string>,
 ): RunningProc {
   const codex = target.codexCliPath;
-  if (!codex) throw new Error("未找到 codex CLI");
+  if (!codex) throw new Error("codex CLI not found");
 
   const env = buildLaunchEnv(instance, secrets);
   const log = logPath(instance.id, "cli");

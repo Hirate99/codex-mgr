@@ -129,7 +129,7 @@ export function renderInstanceConfig(input: ConfigureInput): ConfigureResult {
     try {
       doc = parse(readFileSync(input.baseConfigPath, "utf8")) as Record<string, any>;
     } catch (e: any) {
-      warnings.push(`基础配置 ${input.baseConfigPath} 解析失败，将以空配置继续：${e?.message}`);
+      warnings.push(`Failed to parse base config ${input.baseConfigPath}; continuing with an empty config: ${e?.message}`);
       doc = {};
     }
   }
@@ -138,24 +138,24 @@ export function renderInstanceConfig(input: ConfigureInput): ConfigureResult {
 
   for (const k of DEL_A) {
     if (k in doc) {
-      report(`移除 ${k}（会遮蔽或劫持目标配置）`);
+      report(`Removed ${k} (it would shadow or hijack the target config)`);
       delete doc[k];
     }
   }
   for (const k of DEL_B) {
     if (k in doc) {
-      report(`移除 ${k}（与 models.json 声明冲突）`);
+      report(`Removed ${k} (conflicts with the models.json declaration)`);
       delete doc[k];
     }
   }
   if (doc.profiles) {
-    warnings.push("移除 profiles 段（profile 会遮蔽顶层配置）");
+    warnings.push("Removed the profiles section (profiles would shadow top-level config)");
     delete doc.profiles;
   }
 
   const setKey = (k: string, v: string) => {
     if (doc[k] !== v) {
-      report(doc[k] === undefined ? `写入 ${k} = ${v}` : `改写 ${k}：${JSON.stringify(doc[k])} → ${JSON.stringify(v)}`);
+      report(doc[k] === undefined ? `Set ${k} = ${v}` : `Rewrote ${k}: ${JSON.stringify(doc[k])} → ${JSON.stringify(v)}`);
       doc[k] = v;
     }
   };
@@ -177,7 +177,7 @@ export function renderInstanceConfig(input: ConfigureInput): ConfigureResult {
     for (const [pid, def] of Object.entries(doc.model_providers as Record<string, any>)) {
       if (def && typeof def === "object" && def.wire_api === "chat") {
         def.wire_api = "responses";
-        report(`修正 [model_providers.${pid}] wire_api: "chat" → "responses"`);
+        report(`Fixed [model_providers.${pid}] wire_api: "chat" → "responses"`);
       }
     }
   }
@@ -185,8 +185,8 @@ export function renderInstanceConfig(input: ConfigureInput): ConfigureResult {
   if (input.provider) {
     const p = input.provider;
     const prev = doc.model_providers?.[p.id];
-    if (prev) report(`重写 [model_providers.${p.id}]`);
-    else report(`写入 [model_providers.${p.id}]`);
+    if (prev) report(`Rewrote [model_providers.${p.id}]`);
+    else report(`Set [model_providers.${p.id}]`);
     const def: Record<string, string> = {};
     if (p.name) def.name = p.name;
     if (p.baseUrl) def.base_url = p.baseUrl;
@@ -206,7 +206,7 @@ export function renderInstanceConfig(input: ConfigureInput): ConfigureResult {
       (doc.windows as Record<string, unknown>).sandbox === "elevated"
     ) {
       (doc.windows as Record<string, unknown>).sandbox = "unelevated";
-      report(`[windows] sandbox: "elevated" → "unelevated"（避免第三方实例弹 UAC）`);
+      report(`[windows] sandbox: "elevated" → "unelevated" (avoid UAC pop-ups for third-party instances)`);
     }
   }
 
@@ -214,7 +214,7 @@ export function renderInstanceConfig(input: ConfigureInput): ConfigureResult {
   try {
     parse(toml);
   } catch (e: any) {
-    throw new Error(`生成的 config.toml 未通过 TOML 校验：${e?.message}`);
+    throw new Error(`Generated config.toml failed TOML validation: ${e?.message}`);
   }
   return { toml, changes, warnings };
 }
@@ -306,7 +306,7 @@ export function createInstance(input: CloneInput, home: string): CloneOutput {
 export function switchInstanceModel(instance: Instance, newModel: string): ConfigureResult {
   const existing = join(instance.home, "config.toml");
   if (!existsSync(existing)) {
-    throw new Error(`实例 ${instance.id} 缺少 config.toml`);
+    throw new Error(`Instance ${instance.id} is missing config.toml`);
   }
   copyFileSync(
     existing,

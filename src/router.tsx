@@ -8,16 +8,16 @@ export function getRouter() {
     scrollRestoration: true,
     defaultNotFoundComponent: () => (
       <div className="empty-state">
-        <strong>页面不存在</strong>
-        <p>要访问的资源不存在或链接已失效。</p>
-        <a className="btn primary" href="/">返回控制台</a>
+        <strong>Page not found</strong>
+        <p>The resource you are looking for does not exist or the link is no longer valid.</p>
+        <a className="btn primary" href="/">Back to console</a>
       </div>
     ),
     defaultErrorComponent: ({ error }) => (
       <div className="empty-state">
-        <strong>页面加载失败</strong>
+        <strong>Failed to load page</strong>
         <p>{String(error)}</p>
-        <a className="btn primary" href="/">返回控制台</a>
+        <a className="btn primary" href="/">Back to console</a>
       </div>
     ),
   });

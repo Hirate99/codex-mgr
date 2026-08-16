@@ -120,7 +120,7 @@ const ImportIcon = (
 );
 
 function formatTime(value?: string): string {
-  if (!value) return "未知";
+  if (!value) return "Unknown";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
@@ -145,16 +145,16 @@ function ModelPicker({
   return (
     <div>
       <div className="model-box-head">
-        <button type="button" className="btn sm" onClick={onAll}>全选</button>
-        <button type="button" className="btn sm" onClick={onNone}>清空</button>
+        <button type="button" className="btn sm" onClick={onAll}>Select all</button>
+        <button type="button" className="btn sm" onClick={onNone}>Clear</button>
         <span className="hint">
-          {selected.length}/{models.length} 已选 · 第一个为默认模型 · {source ?? "未知来源"}
+          {selected.length}/{models.length} selected · first is the default model · {source ?? "unknown source"}
         </span>
       </div>
       <div className="model-list">
         {models.length === 0 && (
           <div className="hint" style={{ padding: 8 }}>
-            {error ?? "暂无模型"}
+            {error ?? "No models"}
           </div>
         )}
         {models.map((m) => {
@@ -163,14 +163,14 @@ function ModelPicker({
             <label key={m.slug} className="model-item">
               <input
                 type="checkbox"
-                aria-label={`选择模型 ${m.displayName}`}
+                aria-label={`Select model ${m.displayName}`}
                 checked={idx >= 0}
                 onChange={() => onToggle(m.slug)}
               />
               <span className="model-item-name">
                 {m.displayName} · {m.slug}
               </span>
-              {idx === 0 && <span className="badge live">默认</span>}
+              {idx === 0 && <span className="badge live">Default</span>}
               {idx > 0 && <span className="model-item-order">#{idx + 1}</span>}
             </label>
           );
@@ -184,7 +184,7 @@ function Dashboard() {
   const [status, setStatus] = useState<Status | null>(null);
   const [instances, setInstances] = useState<InstanceView[]>([]);
   const [toast, setToast] = useState("");
-  const [importInfo, setImportInfo] = useState<string>("（未导入）");
+  const [importInfo, setImportInfo] = useState<string>("(not imported)");
   const [allModels, setAllModels] = useState<AllModels | null>(null);
   const [openCodex, setOpenCodex] = useState<OpenCodexStatus | null>(null);
   const [pending, setPending] = useState<Record<string, boolean>>({});
@@ -239,7 +239,7 @@ function Dashboard() {
         setModelsState((s) => ({ ...s, loading: false, error: "HTTP " + r.status }));
       }
     } catch (e: any) {
-      setModelsState((s) => ({ ...s, loading: false, error: e?.message ?? "失败" }));
+      setModelsState((s) => ({ ...s, loading: false, error: e?.message ?? "Failed" }));
     }
   }, []);
 
@@ -259,7 +259,7 @@ function Dashboard() {
       }
       if (adapter.ok) setOpenCodex(adapter.body);
     } catch (e: any) {
-      notify("刷新失败: " + (e?.message ?? e));
+      notify("Refresh failed: " + (e?.message ?? e));
     }
   }, [notify]);
 
@@ -302,7 +302,7 @@ function Dashboard() {
     await runAction("create", async () => {
     const selected = form.selectedModels;
     if (selected.length === 0) {
-      notify("请至少选择一个模型");
+      notify("Select at least one model");
       return;
     }
     const body: any = {
@@ -333,12 +333,12 @@ function Dashboard() {
       body: JSON.stringify(body),
     });
     if (r.ok) {
-      const notes = [r.body.secretNote, `${r.body.changes?.length ?? 0} 处配置变更`]
+      const notes = [r.body.secretNote, `${r.body.changes?.length ?? 0} config change(s)`]
         .filter(Boolean)
         .join("；");
-      notify(`实例已创建：${r.body.instance.id}（${notes}）`);
+      notify(`Instance created: ${r.body.instance.id} (${notes})`);
     } else {
-      notify(r.body.error ?? "创建失败");
+      notify(r.body.error ?? "Create failed");
     }
     await refresh();
     });
@@ -349,8 +349,8 @@ function Dashboard() {
       const r = await api("/api/import");
       if (r.ok) {
         setImportInfo(JSON.stringify(r.body, null, 2));
-        notify("导入完成");
-      } else notify(r.body.error ?? "导入失败");
+        notify("Import complete");
+      } else notify(r.body.error ?? "Import failed");
       await refresh();
     });
   };
@@ -364,8 +364,8 @@ function Dashboard() {
       });
       notify(
         r.ok
-          ? `已启动 ${surface === "cli" ? "Codex CLI" : "桌面客户端"}（${r.body.fingerprint ?? "pid " + r.body.pid}）`
-          : r.body.error ?? "启动失败",
+        ? `Started ${surface === "cli" ? "Codex CLI" : "Desktop app"} (${r.body.fingerprint ?? "pid " + r.body.pid})`
+        : r.body.error ?? "Start failed",
       );
       await refresh();
     });
@@ -378,19 +378,19 @@ function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ surface }),
       });
-      notify(r.ok ? "已停止" : r.body.error ?? "停止失败");
+      notify(r.ok ? "Stopped" : r.body.error ?? "Stop failed");
       await refresh();
     });
   };
 
   const remove = async (i: InstanceView) => {
-    if (!confirm(`删除实例 ${i.id} 及其全部目录？\n\nconfig、模型和本地会话都会被永久删除。`)) return;
+    if (!confirm(`Delete instance ${i.id} and all its directories?\n\nConfig, models, and local sessions will be permanently deleted.`)) return;
     await runAction(`${i.id}:delete`, async () => {
       const r = await api(`/api/instances/${i.id}`, { method: "DELETE" });
       notify(
         r.ok
-          ? `已删除实例及其目录${r.body.removedSecret ? "，同时清理 API key" : ""}`
-          : r.body.error ?? "删除失败",
+        ? `Deleted instance and its directories${r.body.removedSecret ? ", and cleaned up the API key" : ""}`
+        : r.body.error ?? "Delete failed",
       );
       await refresh();
     });
@@ -403,7 +403,7 @@ function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model }),
       });
-      notify(r.ok ? `已切换模型 → ${model}` : r.body.error ?? "切换失败");
+      notify(r.ok ? `Model switched → ${model}` : r.body.error ?? "Switch failed");
       await refresh();
     });
   };
@@ -416,7 +416,7 @@ function Dashboard() {
     zen: { id: "zen", label: "OpenCode Zen" },
     go: { id: "go", label: "OpenCode Go" },
     "opencodex-go": { id: "opencodex-go", label: "OpenCode Go" },
-    custom: { id: "custom", label: "自定义" },
+    custom: { id: "custom", label: "Custom" },
   };
   const DEFAULT_IDS = new Set(Object.values(PRESET_DEFAULTS).map((d) => d.id));
   const DEFAULT_LABELS = new Set(Object.values(PRESET_DEFAULTS).map((d) => d.label));
@@ -439,9 +439,9 @@ function Dashboard() {
       const r = await api("/api/adapters/opencodex/start", { method: "POST" });
       if (r.ok) {
         setOpenCodex(r.body);
-        notify("OpenCodex 已启动");
+        notify("OpenCodex started");
       } else {
-        notify(r.body.error ?? "OpenCodex 启动失败");
+        notify(r.body.error ?? "Failed to start OpenCodex");
       }
       await refresh();
     });
@@ -489,27 +489,27 @@ function Dashboard() {
         </div>
 
         <div className="environment" id="environment">
-          <div className="eyebrow">运行环境</div>
+          <div className="eyebrow">Environment</div>
           <div className="environment-list">
             <div className="environment-row">
               <span className={status?.codexCli ? "status-dot online" : "status-dot"} />
               <span>Codex CLI</span>
-              <small>{status?.codexCli?.version?.split(" ")[1] ?? "未检测"}</small>
+              <small>{status?.codexCli?.version?.split(" ")[1] ?? "Not detected"}</small>
             </div>
             <div className="environment-row">
               <span className={status?.opencodeCli ? "status-dot online" : "status-dot"} />
               <span>OpenCode</span>
-              <small>{status?.opencodeCli?.version ?? "未检测"}</small>
+              <small>{status?.opencodeCli?.version ?? "Not detected"}</small>
             </div>
             <div className="environment-row">
               <span className={status?.desktopApp ? "status-dot online" : "status-dot"} />
-              <span>桌面客户端</span>
-              <small>{status?.desktopApp ? "就绪" : "未检测"}</small>
+              <span>Desktop app</span>
+              <small>{status?.desktopApp ? "Ready" : "Not detected"}</small>
             </div>
           </div>
           <div className="home-path" title={status?.codexHome}>
             <span>CODEX_HOME</span>
-            <code>{status?.codexHome ?? "正在读取…"}</code>
+            <code>{status?.codexHome ?? "Loading..."}</code>
           </div>
         </div>
       </aside>
@@ -517,27 +517,27 @@ function Dashboard() {
       <main className="main-content">
         <header className="page-header">
           <div>
-            <div className="eyebrow">工作区 / 控制台</div>
-            <h1>实例控制台</h1>
-            <p>统一管理本机的 Codex 与 OpenCode 独立实例。</p>
+            <div className="eyebrow">Workspace / Console</div>
+            <h1>Instance Console</h1>
+            <p>Manage independent Codex and OpenCode instances on this machine.</p>
           </div>
           <button type="button" className="btn secondary header-action" onClick={doImport}>
-            {ImportIcon} {pending.import ? "导入中…" : "导入本机配置"}
+            {ImportIcon} {pending.import ? "Importing..." : "Import local config"}
           </button>
         </header>
 
-        <section className="stats" aria-label="运行概览">
+        <section className="stats" aria-label="Runtime overview">
           <div className="stat-card">
             <div className="stat-icon violet">{LayersIcon}</div>
-            <div><span>全部实例</span><strong>{instances.length}</strong><small>个已配置实例</small></div>
+            <div><span>Total instances</span><strong>{instances.length}</strong><small>configured instances</small></div>
           </div>
           <div className="stat-card">
             <div className="stat-icon green">{ActivityIcon}</div>
-            <div><span>正在运行</span><strong>{runningInstances}</strong><small>{status?.runningDesktop.length ?? 0} 个桌面窗口</small></div>
+            <div><span>Running</span><strong>{runningInstances}</strong><small>{status?.runningDesktop.length ?? 0} desktop windows</small></div>
           </div>
           <div className="stat-card">
             <div className="stat-icon blue">{TerminalIcon}</div>
-            <div><span>可用模型</span><strong>{totalModels}</strong><small>来自 4 个模型源</small></div>
+            <div><span>Available models</span><strong>{totalModels}</strong><small>from 4 model sources</small></div>
           </div>
         </section>
 
@@ -545,18 +545,18 @@ function Dashboard() {
           <section className="content-section" id="instances">
             <div className="section-heading">
               <div>
-                <h2>实例</h2>
-                <p>启动客户端、打开 CLI 或切换当前模型。</p>
+                <h2>Instances</h2>
+                <p>Launch apps, open CLIs, or switch models.</p>
               </div>
-              <span className="count-badge">{instances.length} 个实例</span>
+              <span className="count-badge">{instances.length} instances</span>
             </div>
 
             {instances.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon">{LayersIcon}</div>
-                <strong>还没有实例</strong>
-                <p>从右侧创建第一个独立实例，它会显示在这里。</p>
-                <a className="btn primary" href="#create">{PlusIcon} 新建实例</a>
+                <strong>No instances yet</strong>
+                <p>Create your first isolated instance on the right; it will appear here.</p>
+                <a className="btn primary" href="#create">{PlusIcon} New instance</a>
               </div>
             ) : (
               <div className="inst-grid">
@@ -570,43 +570,43 @@ function Dashboard() {
                         <div className="head">
                           <span className="name">{i.label}</span>
                           <span className="badge provider">{i.provider ? i.provider.id : "openai"}</span>
-                          {i.official && <span className="badge official">官方</span>}
+                          {i.official && <span className="badge official">Official</span>}
                         </div>
                         <span className={i.running.length ? "run-state online" : "run-state"}>
                           <span className="status-dot" />
-                          {i.running.length ? `运行中 · ${i.running.join(" + ")}` : "当前未运行"}
+                          {i.running.length ? `Running · ${i.running.join(" + ")}` : "Not running"}
                         </span>
                       </div>
                     </div>
 
                     <div className="instance-details">
                       <div className="detail-row">
-                        <span>当前模型</span>
+                        <span>Current model</span>
                         <code>{i.model}</code>
                       </div>
                       <div className="detail-row">
-                        <span>实例目录</span>
+                        <span>Instance directory</span>
                         <code title={i.home}>{i.home}</code>
                       </div>
                       {(i.models && i.models.length > 1) || i.provider?.envKey ? (
                         <div className="detail-row compact">
-                          <span>配置</span>
+                          <span>Config</span>
                           <small>
-                            {i.models && i.models.length > 1 ? `${i.models.length} 个模型` : ""}
+                            {i.models && i.models.length > 1 ? `${i.models.length} models` : ""}
                             {i.models && i.models.length > 1 && i.provider?.envKey ? " · " : ""}
                             {i.provider?.envKey ?? ""}
                           </small>
                         </div>
                       ) : null}
                       <div className="detail-row compact">
-                        <span>状态</span>
+                        <span>Status</span>
                         <small className="status-summary">
-                          {i.running.includes("desktop") ? "桌面运行" : "桌面停止"}
+                          {i.running.includes("desktop") ? "Desktop running" : "Desktop stopped"}
                           {" · "}
-                          {i.running.includes("cli") ? "CLI 运行" : "CLI 停止"}
-                          {i.runtime?.profileInUse ? " · profile 占用" : ""}
-                          {i.apiKeyConfigured === false ? " · 缺 API key" : ""}
-                          {i.presetRequiresAdapter && !openCodex?.running ? " · 依赖未就绪" : ""}
+                          {i.running.includes("cli") ? "CLI running" : "CLI stopped"}
+                          {i.runtime?.profileInUse ? " · profile in use" : ""}
+                          {i.apiKeyConfigured === false ? " · missing API key" : ""}
+                          {i.presetRequiresAdapter && !openCodex?.running ? " · dependency not ready" : ""}
                         </small>
                       </div>
                     </div>
@@ -621,10 +621,10 @@ function Dashboard() {
                         >
                           {MonitorIcon}{" "}
                           {pending[`${i.id}:desktop:launch`]
-                            ? "启动中…"
+                            ? "Starting..."
                             : i.provider
-                              ? "启动 Codex"
-                              : "打开客户端"}
+                              ? "Launch Codex"
+                              : "Open app"}
                         </button>
                         {i.running.includes("desktop") && (
                           <button
@@ -633,7 +633,7 @@ function Dashboard() {
                             onClick={() => stop(i.id, "desktop")}
                             disabled={pending[`${i.id}:desktop:stop`]}
                           >
-                            {StopIcon} {pending[`${i.id}:desktop:stop`] ? "停止中…" : "停桌面"}
+                            {StopIcon} {pending[`${i.id}:desktop:stop`] ? "Stopping..." : "Stop desktop"}
                           </button>
                         )}
                         {i.running.includes("cli") && (
@@ -643,7 +643,7 @@ function Dashboard() {
                             onClick={() => stop(i.id, "cli")}
                             disabled={pending[`${i.id}:cli:stop`]}
                           >
-                            {StopIcon} {pending[`${i.id}:cli:stop`] ? "停止中…" : "停 CLI"}
+                            {StopIcon} {pending[`${i.id}:cli:stop`] ? "Stopping..." : "Stop CLI"}
                           </button>
                         )}
                       </div>
@@ -654,10 +654,10 @@ function Dashboard() {
                             value={i.model}
                             disabled={pending[`${i.id}:switch-model`]}
                             onChange={(e) => switchModel(i, e.target.value)}
-                            aria-label={`${i.label} 当前模型`}
+                            aria-label={`${i.label} current model`}
                           >
                             {modelPoolFor(i).map((m) => (
-                              <option key={m.slug} value={m.slug}>{m.slug}{m.slug === i.model ? "（当前）" : ""}</option>
+                              <option key={m.slug} value={m.slug}>{m.slug}{m.slug === i.model ? " (current)" : ""}</option>
                             ))}
                           </select>
                           <button
@@ -665,8 +665,8 @@ function Dashboard() {
                             className="icon-btn danger"
                             onClick={() => remove(i)}
                             disabled={pending[`${i.id}:delete`]}
-                            title="删除实例"
-                            aria-label={`删除 ${i.label}`}
+                            title="Delete instance"
+                            aria-label={`Delete ${i.label}`}
                           >
                             {TrashIcon}
                           </button>
@@ -693,14 +693,14 @@ function Dashboard() {
                         }
                       }}
                     >
-                      {expandedInstance === i.id ? "收起详情" : "查看详情"}
+                      {expandedInstance === i.id ? "Collapse details" : "View details"}
                     </button>
 
                     {expandedInstance === i.id && (
                       <div className="instance-drawer">
                         <div className="drawer-grid">
                           <div>
-                            <h4>进程</h4>
+                            <h4>Processes</h4>
                             {i.runtime?.processes.length ? (
                               <ul className="process-list">
                                 {i.runtime.processes.map((process) => (
@@ -714,21 +714,21 @@ function Dashboard() {
                                 ))}
                               </ul>
                             ) : (
-                              <p className="hint">没有检测到进程。</p>
+                              <p className="hint">No processes detected.</p>
                             )}
                           </div>
                           <div>
-                            <h4>环境</h4>
+                            <h4>Environment</h4>
                             <dl className="drawer-facts">
-                              <div><dt>Profile</dt><dd title={i.profile ?? "默认 profile"}>{i.profile ?? "默认 profile"}</dd></div>
-                              <div><dt>API key</dt><dd>{i.provider?.envKey ? (i.apiKeyConfigured ? "已配置" : "未配置") : "不需要"}</dd></div>
-                              <div><dt>OpenCodex</dt><dd>{i.presetRequiresAdapter ? (openCodex?.running ? `运行中 · ${openCodex.port}` : "未运行") : "不依赖"}</dd></div>
-                              <div><dt>启动目录</dt><dd title={i.home}>{i.home}</dd></div>
+                              <div><dt>Profile</dt><dd title={i.profile ?? "default profile"}>{i.profile ?? "default profile"}</dd></div>
+                              <div><dt>API key</dt><dd>{i.provider?.envKey ? (i.apiKeyConfigured ? "Configured" : "Not configured") : "Not required"}</dd></div>
+                              <div><dt>OpenCodex</dt><dd>{i.presetRequiresAdapter ? (openCodex?.running ? `Running · ${openCodex.port}` : "Not running") : "Not required"}</dd></div>
+                              <div><dt>Launch directory</dt><dd title={i.home}>{i.home}</dd></div>
                             </dl>
                           </div>
                         </div>
                         <div>
-                          <h4>最近操作</h4>
+                          <h4>Recent activity</h4>
                           {activityByInstance[i.id]?.length ? (
                             <ul className="activity-list">
                               {activityByInstance[i.id].map((event) => (
@@ -739,7 +739,7 @@ function Dashboard() {
                               ))}
                             </ul>
                           ) : (
-                            <p className="hint">暂无历史记录。</p>
+                            <p className="hint">No history yet.</p>
                           )}
                         </div>
                       </div>
@@ -749,8 +749,8 @@ function Dashboard() {
               </div>
             )}
 
-            <details className="import-result" open={importInfo !== "（未导入）"}>
-              <summary>最近一次导入结果</summary>
+            <details className="import-result" open={importInfo !== "(not imported)"}>
+              <summary>Latest import result</summary>
               <pre>{importInfo}</pre>
             </details>
           </section>
@@ -758,28 +758,28 @@ function Dashboard() {
           <aside className="creator-card" id="create">
             <div className="creator-heading">
               <span className="creator-icon">{PlusIcon}</span>
-              <div><h2>新建实例</h2><p>创建隔离的运行环境</p></div>
+              <div><h2>New instance</h2><p>Create an isolated runtime environment</p></div>
             </div>
             <div className="catalog-summary">
               <span className={modelsState.error ? "catalog-state error" : "catalog-state"}>
                 <span className="status-dot" style={{ background: modelsState.error ? "var(--red)" : "var(--green)" }} />
                 {modelsState.loading
-                  ? "正在探测模型…"
+                  ? "Probing models..."
                   : modelsState.error
-                    ? `模型同步失败：${modelsState.error}`
+                    ? `Model sync failed: ${modelsState.error}`
                     : modelsState.at
-                      ? `${Math.max(0, Math.round((Date.now() - modelsState.at) / 1000))} 秒前更新`
-                      : "等待首次同步…"}
+                      ? `updated ${Math.max(0, Math.round((Date.now() - modelsState.at) / 1000))}s ago`
+                      : "Waiting for first sync..."}
               </span>
-              <span>{totalModels} 个模型可用</span>
+              <span>{totalModels} models available</span>
               <button
                 type="button"
                 className="btn sm ghost"
                 onClick={() => loadModels(true)}
                 disabled={modelsState.loading}
-                title="强制重新探测模型目录"
+                title="Force re-probe model catalog"
               >
-                {modelsState.loading ? "刷新中…" : "立即刷新"}
+                {modelsState.loading ? "Refreshing..." : "Refresh now"}
               </button>
             </div>
             {(form.preset === "zen" || form.preset === "go" || form.preset === "opencodex-go") && (
@@ -787,10 +787,10 @@ function Dashboard() {
                 <span className="status-dot" />
                 <span>
                   {openCodex?.running
-                    ? `OpenCodex 已连接 · localhost:${openCodex.port}`
+                    ? `OpenCodex connected · localhost:${openCodex.port}`
                     : openCodex?.installed
-                      ? "OpenCodex 尚未启动"
-                      : "未检测到 OpenCodex"}
+                      ? "OpenCodex not started"
+                      : "OpenCodex not detected"}
                 </span>
                 {!openCodex?.running && (
                   <button
@@ -799,39 +799,39 @@ function Dashboard() {
                     onClick={startOpenCodex}
                     disabled={pending["adapter:start"]}
                   >
-                    {pending["adapter:start"] ? "启动中…" : openCodex?.installed ? "启动" : "安装说明"}
+                    {pending["adapter:start"] ? "Starting..." : openCodex?.installed ? "Start" : "Install guide"}
                   </button>
                 )}
               </div>
             )}
             <div className="field">
-              <label>模型来源</label>
+              <label>Model source</label>
               <select
                 value={form.preset}
-                aria-label="模型来源"
+                aria-label="Model source"
                 onChange={(e) => onPresetChange(e.target.value)}
               >
                 <option value="deepseek">DeepSeek</option>
                 <option value="zen">OpenCode Zen</option>
                 <option value="go">OpenCode Go</option>
                 <option value="official">OpenAI</option>
-                <option value="custom">自定义</option>
+                <option value="custom">Custom</option>
               </select>
             </div>
             <div className="two-col">
               <div className="field">
-                <label>实例名</label>
+                <label>Instance name</label>
                 <input
-                  aria-label="实例名"
+                  aria-label="Instance name"
                   value={form.id}
                   onChange={(e) => set("id", e.target.value)}
                   placeholder={PRESET_DEFAULTS[form.preset]?.id ?? "deepseek"}
                 />
               </div>
               <div className="field">
-                <label>显示名</label>
+                <label>Display name</label>
                 <input
-                  aria-label="显示名"
+                  aria-label="Display name"
                   value={form.label}
                   onChange={(e) => set("label", e.target.value)}
                   placeholder={PRESET_DEFAULTS[form.preset]?.label ?? "DeepSeek Codex"}
@@ -839,7 +839,7 @@ function Dashboard() {
               </div>
             </div>
             <div className="field">
-              <label>模型 <span className="label-note">第一个选项作为默认</span></label>
+              <label>Model <span className="label-note">first option is the default</span></label>
               <ModelPicker
                 models={currentModelList.models}
                 selected={form.selectedModels}
@@ -861,8 +861,8 @@ function Dashboard() {
               <input aria-label="base_url" value={form.baseUrl} onChange={(e) => set("baseUrl", e.target.value)} />
             </div>
             <div className="field">
-              <label>env_key（API key 环境变量名）</label>
-              <input aria-label="env_key（API key 环境变量名）" value={form.envKey} onChange={(e) => set("envKey", e.target.value)} />
+              <label>env_key (API key env var name)</label>
+              <input aria-label="env_key (API key env var name)" value={form.envKey} onChange={(e) => set("envKey", e.target.value)} />
             </div>
               </>
             )}
@@ -874,20 +874,20 @@ function Dashboard() {
                   aria-label="API Key"
                   value={form.apiKey}
                   onChange={(e) => set("apiKey", e.target.value)}
-                  placeholder="sk-…（写入 ~/.codex-mgr/.env，经 env_key 注入）"
+                  placeholder="sk-... (written to ~/.codex-mgr/.env, injected via env_key)"
                 />
                 <div className="hint">
                   {form.preset === "zen" || form.preset === "go" || form.preset === "opencodex-go"
-                    ? "会写入项目 .env，并自动配置到 OpenCodex 本地适配层"
+                    ? "Written to the project .env and automatically configured in the OpenCodex local adapter"
                     : form.preset === "deepseek" && opencodeKeyForProvider
-                    ? "未填写时自动从 opencode auth.json 导入 DEEPSEEK_API_KEY"
-                    : "留空则使用已有环境变量 / .env 中的值"}
+                    ? "Auto-imports DEEPSEEK_API_KEY from opencode auth.json when left empty"
+                    : "Leave empty to use the existing env var / .env value"}
                 </div>
               </div>
             )}
             <div className="btnrow">
               <button type="button" className="btn primary create-button" onClick={create}>
-                {PlusIcon} {pending.create ? "创建中…" : "创建实例"}
+                {PlusIcon} {pending.create ? "Creating..." : "Create instance"}
               </button>
             </div>
           </aside>

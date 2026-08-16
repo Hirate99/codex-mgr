@@ -14,7 +14,7 @@ let panelServer: { stop: (force?: boolean) => void } | undefined;
 function shutdown(signal: string): void {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`收到 ${signal}，正在退出面板…`);
+  console.log(`Received ${signal}, shutting down the panel...`);
   // Fallback: force-exit after 1.5s if graceful shutdown hangs.
   setTimeout(() => process.exit(0), 1500).unref();
   try {
@@ -45,9 +45,9 @@ void startOpencodex(
   startupSecrets["OPENCODE_GO_API_KEY"] ?? startupSecrets["OPENCODE_API_KEY"],
 ).then((opencodex) => {
   if (opencodex.running) {
-    console.log(`OpenCodex 适配器已启动: http://127.0.0.1:${opencodex.port}`);
+    console.log(`OpenCodex adapter started: http://127.0.0.1:${opencodex.port}`);
   } else {
-    console.warn(`OpenCodex 适配器未启动: ${opencodex.error ?? "请检查依赖"}`);
+    console.warn(`OpenCodex adapter not started: ${opencodex.error ?? "check dependencies"}`);
   }
 });
 
@@ -55,7 +55,7 @@ const CLIENT_DIR = resolve(process.cwd(), "dist", "client");
 const SERVER_ENTRY = resolve(process.cwd(), "dist", "server", "server.js");
 
 if (!existsSync(SERVER_ENTRY)) {
-  console.error("未找到构建产物 dist/server/server.js，请先运行 bun run build");
+  console.error("Build output dist/server/server.js not found; run bun run build first");
   process.exit(1);
 }
 
@@ -107,7 +107,7 @@ for (let p = basePort; p < basePort + 50; p++) {
       },
     });
     panelServer = server;
-    console.log(`codex-mgr 面板: http://127.0.0.1:${p}`);
+    console.log(`codex-mgr panel: http://127.0.0.1:${p}`);
     writeFileSync(
       panelStatePath(),
       JSON.stringify(

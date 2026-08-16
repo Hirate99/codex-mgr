@@ -39,7 +39,7 @@ export function catalogModels(presetId: string): ModelListResult {
   if (!file) return { source: "none", models: [] };
   const p = join(catalogsDir(), file);
   if (!existsSync(p)) {
-    return { source: "none", models: [], error: `缺少目录文件 ${file}` };
+    return { source: "none", models: [], error: `Missing catalog file ${file}` };
   }
   try {
     const parsed = JSON.parse(readFileSync(p, "utf8")) as {
@@ -60,7 +60,7 @@ export function catalogModels(presetId: string): ModelListResult {
     }));
     return { source: "bundled-catalog", models };
   } catch (e: any) {
-    return { source: "none", models: [], error: e?.message ?? "catalog 解析失败" };
+    return { source: "none", models: [], error: e?.message ?? "Failed to parse catalog" };
   }
 }
 
@@ -168,7 +168,7 @@ function probeOfficialModels(): ModelListResult {
     }
   }
   if (!out) {
-    return { source: "none", models: [], error: "codex debug models --bundled 探测失败" };
+    return { source: "none", models: [], error: "codex debug models --bundled probe failed" };
   }
   try {
     const parsed = JSON.parse(out) as {
@@ -188,7 +188,7 @@ function probeOfficialModels(): ModelListResult {
       }));
     return { source: "codex-cli", models };
   } catch (e: any) {
-    return { source: "none", models: [], error: `catalog JSON 解析失败: ${e?.message}` };
+    return { source: "none", models: [], error: `Failed to parse catalog JSON: ${e?.message}` };
   }
 }
 
@@ -200,7 +200,7 @@ export async function probeProviderModels(
   refresh = false,
 ): Promise<ModelListResult> {
   if (!baseUrl || !apiKey) {
-    return { source: "none", models: [], error: "需要 base_url 与 API key" };
+    return { source: "none", models: [], error: "base_url and API key are required" };
   }
   const cacheKey = `${baseUrl}\u0000${apiKey.slice(-8)}`;
   const cached = providerCache.get(cacheKey);
@@ -225,7 +225,7 @@ export async function probeProviderModels(
     providerCache.set(cacheKey, { at: Date.now(), result });
     return result;
   } catch (e: any) {
-    return { source: "none", models: [], error: e?.message ?? "探测失败" };
+    return { source: "none", models: [], error: e?.message ?? "Probe failed" };
   }
 }
 
@@ -268,7 +268,7 @@ function probeOpencodeModels(): ModelListResult {
       break;
     }
   }
-  if (!out) return { source: "none", models: [], error: "opencode models 探测失败" };
+  if (!out) return { source: "none", models: [], error: "opencode models probe failed" };
   const models = out
     .split(/\r?\n/)
     .map((l) => l.trim())

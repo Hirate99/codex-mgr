@@ -83,7 +83,7 @@ export async function opencodexStatus(port = DEFAULT_PORT): Promise<OpenCodexSta
     external: Boolean(identity),
     healthUrl: `http://127.0.0.1:${port}/healthz`,
     version: identity?.version ?? version,
-    error: !cmd ? "未找到 ocx，请先安装 @bitkyc08/opencodex" : undefined,
+    error: !cmd ? "ocx not found; install @bitkyc08/opencodex first" : undefined,
   };
 }
 
@@ -115,9 +115,9 @@ export async function startOpencodex(port = DEFAULT_PORT, _apiKey?: string): Pro
     if (child.pid) {
       try { process.kill(child.pid, 0); child.kill(); } catch { /* already exited */ }
     }
-    return { ...before, error: `OpenCodex 未在 ${port} 端口就绪` };
+    return { ...before, error: `OpenCodex is not ready on port ${port}` };
   } catch (e: any) {
-    return { ...before, error: e?.message ?? "OpenCodex 启动失败" };
+    return { ...before, error: e?.message ?? "Failed to start OpenCodex" };
   }
 }
 
@@ -130,22 +130,22 @@ export async function stopOpencodex(): Promise<{ ok: boolean; error?: string }> 
   const status = await opencodexStatus();
   if (!status.running || !status.pid) return { ok: true };
   const ok = killProcessTree(status.pid);
-  return ok ? { ok } : { ok: false, error: `无法停止 OpenCodex pid ${status.pid}` };
+  return ok ? { ok } : { ok: false, error: `Failed to stop OpenCodex pid ${status.pid}` };
 }
 
 export async function configureOpenCodexProvider(
   input: OpenCodexProviderInput,
 ): Promise<{ ok: boolean; error?: string }> {
   const status = await opencodexStatus();
-  if (!status.installed) return { ok: false, error: "未找到项目内 OpenCodex 依赖" };
+  if (!status.installed) return { ok: false, error: "OpenCodex dependency not found in the project" };
   if (!status.running) {
-    return { ok: false, error: `OpenCodex 未运行（端口 ${status.port}），无法写入 provider` };
+    return { ok: false, error: `OpenCodex is not running (port ${status.port}); cannot configure the provider` };
   }
   const token = adminToken();
   if (!token) {
     return {
       ok: false,
-      error: "缺少 opencodex admin token（~/.opencodex/admin-api-token 或 OPENCODEX_ADMIN_AUTH_TOKEN）",
+      error: "Missing opencodex admin token (~/.opencodex/admin-api-token or OPENCODEX_ADMIN_AUTH_TOKEN)",
     };
   }
   try {
@@ -168,10 +168,10 @@ export async function configureOpenCodexProvider(
       signal: AbortSignal.timeout(15000),
     });
     const data: any = await r.json().catch(() => ({}));
-    if (!r.ok) return { ok: false, error: data?.error ?? `OpenCodex provider 配置失败 (HTTP ${r.status})` };
+    if (!r.ok) return { ok: false, error: data?.error ?? `Failed to configure OpenCodex provider (HTTP ${r.status})` };
     return { ok: true };
   } catch (e: any) {
-    return { ok: false, error: e?.message ?? "OpenCodex provider 配置失败" };
+    return { ok: false, error: e?.message ?? "Failed to configure OpenCodex provider" };
   }
 }
 
