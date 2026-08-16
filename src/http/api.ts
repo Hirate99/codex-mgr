@@ -3,12 +3,7 @@ import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { parse as parseToml } from "smol-toml";
 import { Registry } from "../registry";
-import {
-  probe,
-  runningDesktopProcesses,
-  isPidAlive,
-  killProcessTree,
-} from "../probe";
+import { probe, runningDesktopProcesses, isPidAlive } from "../probe";
 import { importCodexConfig } from "../import";
 import { createInstance, switchInstanceModel, PROVIDER_PRESETS } from "../clone";
 import { launch } from "../launcher";
@@ -28,10 +23,15 @@ import {
   opencodexStatus,
   startOpencodex,
 } from "../opencodex-adapter";
+import { listActivity, recordActivity } from "../activity";
+import { bindRuntimeRegistry, resolveInstanceRuntime, stopInstanceProcesses } from "../runtime";
 import type { Instance, Surface } from "../types";
+
+const reservedInstanceIds = new Set(["official"]);
 
 export const registry = new Registry();
 let secrets = loadSecrets();
+bindRuntimeRegistry(registry);
 
 seed();
 
@@ -113,16 +113,20 @@ function desktopBelongsTo(i: Instance, process: { userDataDir?: string }): boole
   return false;
 }
 
-function serialize(i: Instance, desktopProcesses = runningDesktopProcesses()) {
-  const procs = registry.listProcs().filter((p) => p.instanceId === i.id);
-  const running = procs.filter((p) => p.pid > 0 && isPidAlive(p.pid)).map((p) => p.surface);
-  if (
-    !running.includes("desktop") &&
-    desktopProcesses.some((process) => desktopBelongsTo(i, process))
-  ) {
-    running.push("desktop");
-  }
-  return { ...i, running, official: isOfficial(i) };
+function serialize(i: Instance) {
+  const runtime = resolveInstanceRuntime(i);
+  const running = runtime.processes
+    .filter((process) => !process.stale && process.pid > 0)
+    .map((process) => process.surface);
+  return {
+    ...i,
+    running,
+    runtime,
+    official: isOfficial(i),
+    apiKeyConfigured: i.provider?.envKey ? Boolean(secrets[i.provider.envKey]) : undefined,
+    presetRequiresAdapter:
+      i.preset === "zen" || i.preset === "go" || i.preset === "opencodex-go",
+  };
 }
 
 export const api = new Hono();
@@ -133,6 +137,14 @@ api.get("/api/adapters/opencodex", async (c) => {
 
 api.post("/api/adapters/opencodex/start", async (c) => {
   const result = await startOpencodex();
+  recordActivity({
+    type: "adapter",
+    level: result.running ? "info" : "error",
+    message: result.running
+      ? `OpenCodex 已就绪（pid ${result.pid ?? "unknown"}）`
+      : `OpenCodex 启动失败：${result.error ?? "unknown"}`,
+    detail: { ...result },
+  });
   return c.json(result, result.running ? 200 : 409);
 });
 
@@ -156,8 +168,13 @@ api.get("/api/status", (c) => {
 });
 
 api.get("/api/instances", (c) => {
-  const desktopProcesses = runningDesktopProcesses();
-  return c.json(registry.list().map((instance) => serialize(instance, desktopProcesses)));
+  return c.json(registry.list().map((instance) => serialize(instance)));
+});
+
+api.get("/api/instances/:id/activity", (c) => {
+  const instance = registry.get(c.req.param("id"));
+  if (!instance) return c.json({ error: "实例不存在" }, 404);
+  return c.json({ events: listActivity(instance.id).slice(0, 50) });
 });
 
 api.get("/api/import", (c) => {
@@ -228,6 +245,13 @@ api.post("/api/instances", async (c) => {
   const id = (body.id ?? body.label ?? "").trim().replace(/[^\w.-]+/g, "-").toLowerCase();
   if (!id) return c.json({ error: "缺少 id 或 label" }, 400);
   if (registry.get(id)) return c.json({ error: `实例 ${id} 已存在` }, 409);
+  if (reservedInstanceIds.has(id)) return c.json({ error: `${id} 是保留实例 ID` }, 409);
+  if (existsSync(instanceHome(id))) {
+    return c.json(
+      { error: `实例目录已存在：${instanceHome(id)}。请使用其他 ID，或先删除/导入该目录` },
+      409,
+    );
+  }
 
   const imported = importCodexConfig();
 
@@ -338,6 +362,13 @@ api.post("/api/instances", async (c) => {
       instanceHome(id),
     );
     registry.upsert(out.instance);
+    recordActivity({
+      type: "create",
+      level: out.warnings.length ? "warn" : "info",
+      instanceId: id,
+      message: `实例已创建，${out.changes.length} 处配置变更`,
+      detail: { changes: out.changes, warnings: out.warnings, secretNote },
+    });
     return c.json(
       { instance: serialize(out.instance), changes: out.changes, warnings: out.warnings, secretNote },
       201,
@@ -356,6 +387,13 @@ api.post("/api/instances/:id/switch-model", async (c) => {
     const r = switchInstanceModel(instance, body.model);
     instance.model = body.model;
     registry.upsert(instance);
+    recordActivity({
+      type: "switch-model",
+      level: r.warnings.length ? "warn" : "info",
+      instanceId: instance.id,
+      message: `模型已切换到 ${body.model}`,
+      detail: { changes: r.changes, warnings: r.warnings },
+    });
     return c.json({ changes: r.changes, warnings: r.warnings });
   } catch (e: any) {
     return c.json({ error: e?.message ?? "切换失败" }, 500);
@@ -374,18 +412,29 @@ api.post("/api/instances/:id/launch", async (c) => {
       409,
     );
   }
-  const existing = registry.getProc(instance.id, surface);
-  const desktopProcesses = surface === "desktop" ? runningDesktopProcesses() : [];
-  const desktopStillBelongs = surface === "desktop" && desktopProcesses.some((process) => desktopBelongsTo(instance, process));
-  if (existing && isPidAlive(existing.pid) && (surface !== "desktop" || desktopStillBelongs)) {
-    return c.json({ error: `实例已在该 surface 运行 (pid ${existing.pid})` }, 409);
+  const runtime = resolveInstanceRuntime(instance);
+  if (runtime.processes.some((process) => process.surface === surface && !process.stale && process.pid > 0)) {
+    return c.json({ error: `实例已在该 surface 运行`, runtime }, 409);
   }
-  if (existing && surface === "desktop" && !desktopStillBelongs) registry.deleteProc(instance.id, surface);
+  registry.deleteProc(instance.id, surface);
   try {
     const proc = launch(instance, surface, targets(), secrets);
     registry.setProc(proc);
+    recordActivity({
+      type: "launch",
+      level: "info",
+      instanceId: instance.id,
+      message: `${surface === "desktop" ? "桌面客户端" : "Codex CLI"} 已启动（pid ${proc.pid}）`,
+      detail: { surface, pid: proc.pid, fingerprint: proc.fingerprint },
+    });
     return c.json(proc, 201);
   } catch (e: any) {
+    recordActivity({
+      type: "error",
+      level: "error",
+      instanceId: instance.id,
+      message: `启动 ${surface} 失败：${e?.message ?? "unknown"}`,
+    });
     return c.json({ error: e?.message ?? "启动失败" }, 500);
   }
 });
@@ -395,11 +444,30 @@ api.post("/api/instances/:id/stop", async (c) => {
   if (!instance) return c.json({ error: "实例不存在" }, 404);
   const body = (await c.req.json().catch(() => ({}))) as { surface?: Surface };
   const surface = body.surface ?? "desktop";
-  const proc = registry.getProc(instance.id, surface);
-  if (!proc) return c.json({ error: "无运行记录" }, 404);
-  const ok = killProcessTree(proc.pid);
+  const result = stopInstanceProcesses(instance, surface);
   registry.deleteProc(instance.id, surface);
-  return c.json({ ok, pid: proc.pid });
+  const ok = result.failed.length === 0 && result.killed.length > 0;
+  recordActivity({
+    type: "stop",
+    level: ok ? "info" : "error",
+    instanceId: instance.id,
+    message: ok
+      ? `${surface} 已停止（pid ${result.killed.join(", ")}）`
+      : `停止 ${surface} 失败（killed=${result.killed.join(", ") || "none"}, failed=${result.failed.join(", ") || "none"}）`,
+    detail: { ...result },
+  });
+  if (!ok) {
+    return c.json(
+      {
+        error: result.killed.length > 0
+          ? `部分进程已停止，但 pid ${result.failed.join(", ")} 停止失败`
+          : `未找到可停止的 ${surface} 进程`,
+        ...result,
+      },
+      result.killed.length > 0 ? 500 : 404,
+    );
+  }
+  return c.json({ ok, ...result });
 });
 
 api.delete("/api/instances/:id", (c) => {
@@ -408,21 +476,13 @@ api.delete("/api/instances/:id", (c) => {
   if (isOfficial(instance)) {
     return c.json({ error: "官方实例不可删除（共享已登录客户端与 ~/.codex）" }, 403);
   }
-  for (const proc of registry.listProcs().filter((p) => p.instanceId === instance.id)) {
-    killProcessTree(proc.pid);
-    registry.deleteProc(instance.id, proc.surface);
-  }
-  // The registry is runtime-only for process state, so a server restart can
-  // leave a desktop process untracked. Match it by the instance profile too.
-  if (instance.profile) {
-    for (const proc of runningDesktopProcesses()) {
-      if (proc.userDataDir && resolve(proc.userDataDir) === resolve(instance.profile)) {
-        killProcessTree(proc.pid);
-      }
-    }
-  }
+  stopInstanceProcesses(instance, "desktop");
+  stopInstanceProcesses(instance, "cli");
+  registry.deleteProc(instance.id, "desktop");
+  registry.deleteProc(instance.id, "cli");
   const envKey = instance.provider?.envKey;
   let removedFiles = false;
+  let removedSecret = false;
   const root = resolve(instancesRoot());
   const home = resolve(instance.home);
   const rel = relative(root, home);
@@ -432,15 +492,19 @@ api.delete("/api/instances/:id", (c) => {
     removedFiles = true;
   }
   registry.remove(instance.id);
-
   // API keys are shared by env var name. Remove the secret only when no
   // remaining instance references it.
-  let removedSecret = false;
   if (envKey && !registry.list().some((other) => other.provider?.envKey === envKey)) {
     deleteSecret(envKey);
     secrets = loadSecrets();
     removedSecret = true;
   }
+  recordActivity({
+    type: "delete",
+    level: "info",
+    instanceId: instance.id,
+    message: `实例已删除${removedFiles ? "及其实例目录" : ""}${removedSecret ? "，并清理 API key" : ""}`,
+  });
   return c.json({ ok: true, removedFiles, removedSecret });
 });
 

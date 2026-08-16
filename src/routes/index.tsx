@@ -27,6 +27,31 @@ interface InstanceView {
   modelCatalog?: string;
   official?: boolean;
   running: string[];
+  runtime?: InstanceRuntimeView;
+  apiKeyConfigured?: boolean;
+  presetRequiresAdapter?: boolean;
+}
+
+interface RuntimeProcessView {
+  pid: number;
+  surface: "desktop" | "cli";
+  startedAt?: string;
+  source: "registry" | "desktop-scan" | "tracked-fallback";
+  managed: boolean;
+  stale?: boolean;
+}
+
+interface InstanceRuntimeView {
+  processes: RuntimeProcessView[];
+  profileInUse: boolean;
+  untrackedDesktop: boolean;
+}
+
+interface ActivityEventView {
+  at: string;
+  type: string;
+  level: "info" | "warn" | "error";
+  message: string;
 }
 
 interface ModelOption {
@@ -94,6 +119,12 @@ const ImportIcon = (
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M8 2v8M5 7l3 3 3-3M3 13h10" /></svg>
 );
 
+function formatTime(value?: string): string {
+  if (!value) return "未知";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
 function ModelPicker({
   models,
   selected,
@@ -132,6 +163,7 @@ function ModelPicker({
             <label key={m.slug} className="model-item">
               <input
                 type="checkbox"
+                aria-label={`选择模型 ${m.displayName}`}
                 checked={idx >= 0}
                 onChange={() => onToggle(m.slug)}
               />
@@ -155,6 +187,9 @@ function Dashboard() {
   const [importInfo, setImportInfo] = useState<string>("（未导入）");
   const [allModels, setAllModels] = useState<AllModels | null>(null);
   const [openCodex, setOpenCodex] = useState<OpenCodexStatus | null>(null);
+  const [pending, setPending] = useState<Record<string, boolean>>({});
+  const [expandedInstance, setExpandedInstance] = useState<string | null>(null);
+  const [activityByInstance, setActivityByInstance] = useState<Record<string, ActivityEventView[]>>({});
   const [modelsState, setModelsState] = useState<{
     loading: boolean;
     at?: number;
@@ -175,6 +210,23 @@ function Dashboard() {
     setToast(msg);
     setTimeout(() => setToast(""), 3200);
   }, []);
+
+  const runAction = useCallback(async (
+    key: string,
+    action: () => Promise<void>,
+  ) => {
+    if (pending[key]) return;
+    setPending((current) => ({ ...current, [key]: true }));
+    try {
+      await action();
+    } finally {
+      setPending((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+    }
+  }, [pending]);
 
   const loadModels = useCallback(async (force = false) => {
     setModelsState((s) => ({ ...s, loading: true }));
@@ -247,6 +299,7 @@ function Dashboard() {
   };
 
   const create = async () => {
+    await runAction("create", async () => {
     const selected = form.selectedModels;
     if (selected.length === 0) {
       notify("请至少选择一个模型");
@@ -287,56 +340,72 @@ function Dashboard() {
     } else {
       notify(r.body.error ?? "创建失败");
     }
-    refresh();
+    await refresh();
+    });
   };
 
   const doImport = async () => {
-    const r = await api("/api/import");
-    if (r.ok) {
-      setImportInfo(JSON.stringify(r.body, null, 2));
-      notify("导入完成");
-    } else notify("导入失败");
+    await runAction("import", async () => {
+      const r = await api("/api/import");
+      if (r.ok) {
+        setImportInfo(JSON.stringify(r.body, null, 2));
+        notify("导入完成");
+      } else notify(r.body.error ?? "导入失败");
+      await refresh();
+    });
   };
 
   const launch = async (id: string, surface: string) => {
-    const r = await api(`/api/instances/${id}/launch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ surface }),
+    await runAction(`${id}:${surface}:launch`, async () => {
+      const r = await api(`/api/instances/${id}/launch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ surface }),
+      });
+      notify(
+        r.ok
+          ? `已启动 ${surface === "cli" ? "Codex CLI" : "桌面客户端"}（${r.body.fingerprint ?? "pid " + r.body.pid}）`
+          : r.body.error ?? "启动失败",
+      );
+      await refresh();
     });
-    notify(r.ok ? `已启动 ${surface === "cli" ? "Codex CLI" : "桌面客户端"}（${r.body.fingerprint ?? "pid " + r.body.pid}）` : r.body.error ?? "启动失败");
-    refresh();
   };
 
   const stop = async (id: string, surface: string) => {
-    const r = await api(`/api/instances/${id}/stop`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ surface }),
+    await runAction(`${id}:${surface}:stop`, async () => {
+      const r = await api(`/api/instances/${id}/stop`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ surface }),
+      });
+      notify(r.ok ? "已停止" : r.body.error ?? "停止失败");
+      await refresh();
     });
-    notify(r.ok ? "已停止" : r.body.error ?? "停止失败");
-    refresh();
   };
 
   const remove = async (i: InstanceView) => {
     if (!confirm(`删除实例 ${i.id} 及其全部目录？\n\nconfig、模型和本地会话都会被永久删除。`)) return;
-    const r = await api(`/api/instances/${i.id}`, { method: "DELETE" });
-    notify(
-      r.ok
-        ? `已删除实例及其目录${r.body.removedSecret ? "，同时清理 API key" : ""}`
-        : r.body.error ?? "删除失败",
-    );
-    refresh();
+    await runAction(`${i.id}:delete`, async () => {
+      const r = await api(`/api/instances/${i.id}`, { method: "DELETE" });
+      notify(
+        r.ok
+          ? `已删除实例及其目录${r.body.removedSecret ? "，同时清理 API key" : ""}`
+          : r.body.error ?? "删除失败",
+      );
+      await refresh();
+    });
   };
 
   const switchModel = async (i: InstanceView, model: string) => {
-    const r = await api(`/api/instances/${i.id}/switch-model`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model }),
+    await runAction(`${i.id}:switch-model`, async () => {
+      const r = await api(`/api/instances/${i.id}/switch-model`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model }),
+      });
+      notify(r.ok ? `已切换模型 → ${model}` : r.body.error ?? "切换失败");
+      await refresh();
     });
-    notify(r.ok ? `已切换模型 → ${model}` : r.body.error ?? "切换失败");
-    refresh();
   };
 
   const set = (k: string, v: any) => setForm((f) => ({ ...f, [k]: v }));
@@ -366,13 +435,16 @@ function Dashboard() {
   };
 
   const startOpenCodex = async () => {
-    const r = await api("/api/adapters/opencodex/start", { method: "POST" });
-    if (r.ok) {
-      setOpenCodex(r.body);
-      notify("OpenCodex 已启动");
-    } else {
-      notify(r.body.error ?? "OpenCodex 启动失败");
-    }
+    await runAction("adapter:start", async () => {
+      const r = await api("/api/adapters/opencodex/start", { method: "POST" });
+      if (r.ok) {
+        setOpenCodex(r.body);
+        notify("OpenCodex 已启动");
+      } else {
+        notify(r.body.error ?? "OpenCodex 启动失败");
+      }
+      await refresh();
+    });
   };
 
   const opencodeKeyForProvider = status?.opencodeAuth?.entries.find(
@@ -450,7 +522,7 @@ function Dashboard() {
             <p>统一管理本机的 Codex 与 OpenCode 独立实例。</p>
           </div>
           <button type="button" className="btn secondary header-action" onClick={doImport}>
-            {ImportIcon} 导入本机配置
+            {ImportIcon} {pending.import ? "导入中…" : "导入本机配置"}
           </button>
         </header>
 
@@ -526,6 +598,17 @@ function Dashboard() {
                           </small>
                         </div>
                       ) : null}
+                      <div className="detail-row compact">
+                        <span>状态</span>
+                        <small className="status-summary">
+                          {i.running.includes("desktop") ? "桌面运行" : "桌面停止"}
+                          {" · "}
+                          {i.running.includes("cli") ? "CLI 运行" : "CLI 停止"}
+                          {i.runtime?.profileInUse ? " · profile 占用" : ""}
+                          {i.apiKeyConfigured === false ? " · 缺 API key" : ""}
+                          {i.presetRequiresAdapter && !openCodex?.running ? " · 依赖未就绪" : ""}
+                        </small>
+                      </div>
                     </div>
 
                     <div className="instance-actions">
@@ -534,14 +617,34 @@ function Dashboard() {
                           type="button"
                           className="btn primary"
                           onClick={() => launch(i.id, "desktop")}
+                          disabled={pending[`${i.id}:desktop:launch`]}
                         >
-                          {MonitorIcon} {i.provider ? "启动 Codex" : "打开客户端"}
+                          {MonitorIcon}{" "}
+                          {pending[`${i.id}:desktop:launch`]
+                            ? "启动中…"
+                            : i.provider
+                              ? "启动 Codex"
+                              : "打开客户端"}
                         </button>
                         {i.running.includes("desktop") && (
-                          <button type="button" className="btn secondary" onClick={() => stop(i.id, "desktop")}>{StopIcon} 停桌面</button>
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            onClick={() => stop(i.id, "desktop")}
+                            disabled={pending[`${i.id}:desktop:stop`]}
+                          >
+                            {StopIcon} {pending[`${i.id}:desktop:stop`] ? "停止中…" : "停桌面"}
+                          </button>
                         )}
                         {i.running.includes("cli") && (
-                          <button type="button" className="btn secondary" onClick={() => stop(i.id, "cli")}>{StopIcon} 停 CLI</button>
+                          <button
+                            type="button"
+                            className="btn secondary"
+                            onClick={() => stop(i.id, "cli")}
+                            disabled={pending[`${i.id}:cli:stop`]}
+                          >
+                            {StopIcon} {pending[`${i.id}:cli:stop`] ? "停止中…" : "停 CLI"}
+                          </button>
                         )}
                       </div>
                       {!i.official && (
@@ -549,6 +652,7 @@ function Dashboard() {
                           <select
                             className="model-switch"
                             value={i.model}
+                            disabled={pending[`${i.id}:switch-model`]}
                             onChange={(e) => switchModel(i, e.target.value)}
                             aria-label={`${i.label} 当前模型`}
                           >
@@ -556,12 +660,90 @@ function Dashboard() {
                               <option key={m.slug} value={m.slug}>{m.slug}{m.slug === i.model ? "（当前）" : ""}</option>
                             ))}
                           </select>
-                          <button type="button" className="icon-btn danger" onClick={() => remove(i)} title="删除实例" aria-label={`删除 ${i.label}`}>
+                          <button
+                            type="button"
+                            className="icon-btn danger"
+                            onClick={() => remove(i)}
+                            disabled={pending[`${i.id}:delete`]}
+                            title="删除实例"
+                            aria-label={`删除 ${i.label}`}
+                          >
                             {TrashIcon}
                           </button>
                         </div>
                       )}
                     </div>
+
+                    <button
+                      type="button"
+                      className="details-toggle"
+                      aria-expanded={expandedInstance === i.id}
+                      onClick={() => {
+                        const next = expandedInstance === i.id ? null : i.id;
+                        setExpandedInstance(next);
+                        if (next) {
+                          api(`/api/instances/${i.id}/activity`).then((r) => {
+                            if (r.ok) {
+                              setActivityByInstance((current) => ({
+                                ...current,
+                                [i.id]: r.body.events ?? [],
+                              }));
+                            }
+                          });
+                        }
+                      }}
+                    >
+                      {expandedInstance === i.id ? "收起详情" : "查看详情"}
+                    </button>
+
+                    {expandedInstance === i.id && (
+                      <div className="instance-drawer">
+                        <div className="drawer-grid">
+                          <div>
+                            <h4>进程</h4>
+                            {i.runtime?.processes.length ? (
+                              <ul className="process-list">
+                                {i.runtime.processes.map((process) => (
+                                  <li key={`${process.surface}-${process.pid}`}>
+                                    <span className="badge">{process.surface}</span>
+                                    <code>PID {process.pid}</code>
+                                    <small>{formatTime(process.startedAt)}</small>
+                                    <small>{process.managed ? "managed" : process.source}</small>
+                                    {process.stale && <span className="badge">stale</span>}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="hint">没有检测到进程。</p>
+                            )}
+                          </div>
+                          <div>
+                            <h4>环境</h4>
+                            <dl className="drawer-facts">
+                              <div><dt>Profile</dt><dd title={i.profile ?? "默认 profile"}>{i.profile ?? "默认 profile"}</dd></div>
+                              <div><dt>API key</dt><dd>{i.provider?.envKey ? (i.apiKeyConfigured ? "已配置" : "未配置") : "不需要"}</dd></div>
+                              <div><dt>OpenCodex</dt><dd>{i.presetRequiresAdapter ? (openCodex?.running ? `运行中 · ${openCodex.port}` : "未运行") : "不依赖"}</dd></div>
+                              <div><dt>启动目录</dt><dd title={i.home}>{i.home}</dd></div>
+                            </dl>
+                          </div>
+                        </div>
+                        <div>
+                          <h4>最近操作</h4>
+                          {activityByInstance[i.id]?.length ? (
+                            <ul className="activity-list">
+                              {activityByInstance[i.id].map((event) => (
+                                <li key={`${event.at}-${event.message}`} className={event.level}>
+                                  <small>{formatTime(event.at)}</small>
+                                  <span>{event.message}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="hint">暂无历史记录。</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </article>
                 ))}
               </div>
@@ -611,8 +793,13 @@ function Dashboard() {
                       : "未检测到 OpenCodex"}
                 </span>
                 {!openCodex?.running && (
-                  <button type="button" className="btn sm" onClick={startOpenCodex}>
-                    {openCodex?.installed ? "启动" : "安装说明"}
+                  <button
+                    type="button"
+                    className="btn sm"
+                    onClick={startOpenCodex}
+                    disabled={pending["adapter:start"]}
+                  >
+                    {pending["adapter:start"] ? "启动中…" : openCodex?.installed ? "启动" : "安装说明"}
                   </button>
                 )}
               </div>
@@ -621,6 +808,7 @@ function Dashboard() {
               <label>模型来源</label>
               <select
                 value={form.preset}
+                aria-label="模型来源"
                 onChange={(e) => onPresetChange(e.target.value)}
               >
                 <option value="deepseek">DeepSeek</option>
@@ -633,11 +821,21 @@ function Dashboard() {
             <div className="two-col">
               <div className="field">
                 <label>实例名</label>
-                <input value={form.id} onChange={(e) => set("id", e.target.value)} placeholder={PRESET_DEFAULTS[form.preset]?.id ?? "deepseek"} />
+                <input
+                  aria-label="实例名"
+                  value={form.id}
+                  onChange={(e) => set("id", e.target.value)}
+                  placeholder={PRESET_DEFAULTS[form.preset]?.id ?? "deepseek"}
+                />
               </div>
               <div className="field">
                 <label>显示名</label>
-                <input value={form.label} onChange={(e) => set("label", e.target.value)} placeholder={PRESET_DEFAULTS[form.preset]?.label ?? "DeepSeek Codex"} />
+                <input
+                  aria-label="显示名"
+                  value={form.label}
+                  onChange={(e) => set("label", e.target.value)}
+                  placeholder={PRESET_DEFAULTS[form.preset]?.label ?? "DeepSeek Codex"}
+                />
               </div>
             </div>
             <div className="field">
@@ -654,18 +852,18 @@ function Dashboard() {
             </div>
             {form.preset === "custom" && (
               <>
-                <div className="field">
-                  <label>provider id</label>
-                  <input value={form.pid} onChange={(e) => set("pid", e.target.value)} placeholder="deepseek" />
-                </div>
-                <div className="field">
-                  <label>base_url</label>
-                  <input value={form.baseUrl} onChange={(e) => set("baseUrl", e.target.value)} />
-                </div>
-                <div className="field">
-                  <label>env_key（API key 环境变量名）</label>
-                  <input value={form.envKey} onChange={(e) => set("envKey", e.target.value)} />
-                </div>
+            <div className="field">
+              <label>provider id</label>
+              <input aria-label="provider id" value={form.pid} onChange={(e) => set("pid", e.target.value)} placeholder="deepseek" />
+            </div>
+            <div className="field">
+              <label>base_url</label>
+              <input aria-label="base_url" value={form.baseUrl} onChange={(e) => set("baseUrl", e.target.value)} />
+            </div>
+            <div className="field">
+              <label>env_key（API key 环境变量名）</label>
+              <input aria-label="env_key（API key 环境变量名）" value={form.envKey} onChange={(e) => set("envKey", e.target.value)} />
+            </div>
               </>
             )}
             {form.preset !== "official" && (
@@ -673,6 +871,7 @@ function Dashboard() {
                 <label>API Key</label>
                 <input
                   type="password"
+                  aria-label="API Key"
                   value={form.apiKey}
                   onChange={(e) => set("apiKey", e.target.value)}
                   placeholder="sk-…（写入 ~/.codex-mgr/.env，经 env_key 注入）"
@@ -688,7 +887,7 @@ function Dashboard() {
             )}
             <div className="btnrow">
               <button type="button" className="btn primary create-button" onClick={create}>
-                {PlusIcon} 创建实例
+                {PlusIcon} {pending.create ? "创建中…" : "创建实例"}
               </button>
             </div>
           </aside>

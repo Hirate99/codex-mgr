@@ -3,9 +3,6 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { defineConfig, type Plugin } from "vite";
 import { fileURLToPath } from "node:url";
 import type { IncomingMessage } from "node:http";
-import { startOpencodex } from "./src/opencodex-adapter";
-import { loadSecrets } from "./src/secrets";
-
 function readBody(req: IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -19,17 +16,8 @@ function apiMiddleware(): Plugin {
   return {
     name: "codex-mgr-api",
     configureServer(server) {
-      // 并发拉起 opencodex（dev 模式下不阻塞 Vite 启动）
-      void startOpencodex(
-        undefined,
-        loadSecrets()["OPENCODE_GO_API_KEY"] ?? loadSecrets()["OPENCODE_API_KEY"],
-      ).then((result) => {
-        if (result.running) {
-          console.log(`OpenCodex 适配器已启动: http://127.0.0.1:${result.port}`);
-        } else {
-          console.warn(`OpenCodex 适配器未启动: ${result.error ?? "请检查依赖"}`);
-        }
-      });
+      // The API layer starts OpenCodex as a detached Bun subprocess. Starting it from
+      // Vite's Node process was dev-only behavior and failed the package's Bun check.
       server.middlewares.use(async (req, res, next) => {
         const url = req.url ?? "/";
         if (!url.startsWith("/api/")) return next();

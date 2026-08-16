@@ -57,6 +57,19 @@ export interface RunningProc {
   fingerprint?: string;
 }
 
+export interface InstanceRuntimeStatus {
+  processes: {
+    pid: number;
+    surface: Surface;
+    startedAt?: string;
+    source: "registry" | "desktop-scan" | "tracked-fallback";
+    managed: boolean;
+    stale?: boolean;
+  }[];
+  profileInUse: boolean;
+  untrackedDesktop: boolean;
+}
+
 export interface RegistryFile {
   version: 1;
   instances: Instance[];

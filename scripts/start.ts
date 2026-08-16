@@ -1,24 +1,19 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { api } from "../src/http/api";
-import { startOpencodex, stopOpencodex } from "../src/opencodex-adapter";
+import { startOpencodex } from "../src/opencodex-adapter";
 import { loadSecrets } from "../src/secrets";
 
-// 尽早注册信号处理，保证启动阶段按 Ctrl+C 也能干净退出，不留占端口的进程。
+// 尽早注册信号处理。OpenCodex 是独立 detached 进程，面板退出时不得连带停止它。
 let shuttingDown = false;
 let panelServer: { stop: (force?: boolean) => void } | undefined;
 
 function shutdown(signal: string): void {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`收到 ${signal}，正在清理 opencodex / 面板进程…`);
+  console.log(`收到 ${signal}，正在退出面板…`);
   // 兜底：若优雅停止被挂起，1.5s 后强制退出。
   setTimeout(() => process.exit(0), 1500).unref();
-  try {
-    if (stopOpencodex()) console.log("opencodex 已停止");
-  } catch (e: any) {
-    console.error("停止 opencodex 失败:", e?.message ?? e);
-  }
   try {
     panelServer?.stop(true);
   } catch {

@@ -227,6 +227,38 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .instance-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .launch-actions, .manage-actions { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .manage-actions { justify-content: flex-end; }
+.status-summary { color: #65707d; }
+.details-toggle {
+  justify-self: start;
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.details-toggle:hover { text-decoration: underline; }
+.instance-drawer {
+  display: grid;
+  gap: 15px;
+  margin-top: 13px;
+  padding-top: 13px;
+  border-top: 1px dashed var(--border);
+}
+.instance-drawer h4 { margin: 0 0 8px; font-size: 10.5px; color: var(--dim); letter-spacing: .08em; text-transform: uppercase; }
+.drawer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.process-list, .activity-list, .drawer-facts { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.process-list li { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 10px; color: var(--muted); }
+.process-list code { font: 9.5px var(--mono); }
+.process-list small, .activity-list small { flex: 0 0 auto; color: var(--dim); }
+.drawer-facts div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 7px; }
+.drawer-facts dt { color: var(--dim); font-size: 10px; }
+.drawer-facts dd { overflow: hidden; margin: 0; color: #4c5563; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.activity-list li { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 8px; padding: 6px 7px; border: 1px solid var(--border-soft); border-radius: 6px; background: var(--surface-soft); font-size: 10px; }
+.activity-list li.warn { border-color: #eadbbc; background: #fbf7ee; }
+.activity-list li.error { border-color: #edc3ca; background: #fdf4f5; color: #95313f; }
 
 .creator-card {
   position: sticky;
@@ -326,6 +358,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .instance-actions { align-items: flex-start; flex-direction: column; }
   .manage-actions { width: 100%; justify-content: flex-start; }
   .model-switch { flex: 1; max-width: none; }
+  .drawer-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 900px) {
   .sidebar { position: static; width: 100%; height: auto; flex-direction: row; align-items: center; padding: 14px 20px; border-right: 0; border-bottom: 1px solid var(--border-soft); }
