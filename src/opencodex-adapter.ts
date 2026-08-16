@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { killProcessTree } from "./probe";
 
 const DEFAULT_PORT = 10100;
 
@@ -124,6 +125,13 @@ export async function startOpencodex(port = DEFAULT_PORT, _apiKey?: string): Pro
  * 通过 opencodex 的本地管理 API 写入 provider（POST /api/providers 会同时持久化并热更新），
  * 不再走 `ocx provider add` + `ocx restart`（restart 会再次注入默认 Codex 配置）。
  */
+export async function stopOpencodex(): Promise<{ ok: boolean; error?: string }> {
+  const status = await opencodexStatus();
+  if (!status.running || !status.pid) return { ok: true };
+  const ok = killProcessTree(status.pid);
+  return ok ? { ok } : { ok: false, error: `无法停止 OpenCodex pid ${status.pid}` };
+}
+
 export async function configureOpenCodexProvider(
   input: OpenCodexProviderInput,
 ): Promise<{ ok: boolean; error?: string }> {

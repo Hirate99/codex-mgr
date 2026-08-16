@@ -1,8 +1,10 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { api } from "../src/http/api";
 import { startOpencodex } from "../src/opencodex-adapter";
 import { loadSecrets } from "../src/secrets";
+import { panelLogPath, panelStatePath } from "../src/paths";
+
 
 // 尽早注册信号处理。OpenCodex 是独立 detached 进程，面板退出时不得连带停止它。
 let shuttingDown = false;
@@ -18,6 +20,11 @@ function shutdown(signal: string): void {
     panelServer?.stop(true);
   } catch {
     /* 面板可能尚未启动 */
+  }
+  try {
+    if (existsSync(panelStatePath())) writeFileSync(panelStatePath(), "", "utf8");
+  } catch {
+    /* 状态文件清理是 best effort */
   }
   process.exit(0);
 }
@@ -100,6 +107,21 @@ for (let p = basePort; p < basePort + 50; p++) {
     });
     panelServer = server;
     console.log(`codex-mgr 面板: http://127.0.0.1:${p}`);
+    writeFileSync(
+      panelStatePath(),
+      JSON.stringify(
+        {
+          version: 1,
+          pid: process.pid,
+          port: p,
+          startedAt: new Date().toISOString(),
+          log: panelLogPath(),
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
     break;
   } catch (e: any) {
     if (e?.code === "EADDRINUSE" || String(e).includes("in use")) continue;

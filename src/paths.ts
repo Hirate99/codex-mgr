@@ -29,6 +29,16 @@ export function envFilePath(): string {
   return join(mgrRoot(), ".env");
 }
 
+/** 面板后台运行状态文件 */
+export function panelStatePath(): string {
+  return join(mgrRoot(), "panel-state.json");
+}
+
+/** 面板后台运行日志 */
+export function panelLogPath(): string {
+  return join(mgrRoot(), "panel.log");
+}
+
 /** 实例根目录：每个第三方实例一个独立 CODEX_HOME */
 export function instancesRoot(): string {
   return join(homeDir(), ".codex-instances");

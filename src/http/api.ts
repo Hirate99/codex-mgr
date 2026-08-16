@@ -22,6 +22,7 @@ import {
   opencodexPort,
   opencodexStatus,
   startOpencodex,
+  stopOpencodex,
 } from "../opencodex-adapter";
 import { listActivity, recordActivity } from "../activity";
 import { bindRuntimeRegistry, resolveInstanceRuntime, stopInstanceProcesses } from "../runtime";
@@ -146,6 +147,16 @@ api.post("/api/adapters/opencodex/start", async (c) => {
     detail: { ...result },
   });
   return c.json(result, result.running ? 200 : 409);
+});
+
+api.post("/api/adapters/opencodex/stop", async (c) => {
+  const result = await stopOpencodex();
+  recordActivity({
+    type: "adapter",
+    level: result.ok ? "info" : "error",
+    message: result.ok ? "OpenCodex 已停止" : `OpenCodex 停止失败：${result.error}`,
+  });
+  return c.json(result, result.ok ? 200 : 500);
 });
 
 api.get("/api/status", (c) => {

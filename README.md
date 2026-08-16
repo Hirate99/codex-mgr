@@ -29,3 +29,24 @@ bun run dev
 bun run build
 bun run start
 ```
+
+## 后台运行 / 退出
+
+```bash
+# 后台启动面板
+bun run daemon start
+
+# 查看面板状态
+bun run daemon status
+
+# 只停止面板，OpenCodex 和实例继续运行
+bun run daemon stop
+```
+
+状态文件位于 `~/.codex-mgr/panel-state.json`，日志位于 `~/.codex-mgr/panel.log`。
+
+OpenCodex 是独立进程。需要停止 OpenCodex 时调用：
+
+```bash
+curl -X POST http://127.0.0.1:9810/api/adapters/opencodex/stop
+```
