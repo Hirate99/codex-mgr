@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
 import { codexCliCandidates } from "./paths";
+import { spawnSync } from "./proc";
 
 export interface ModelOption {
   slug: string;

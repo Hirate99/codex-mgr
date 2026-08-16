@@ -22,27 +22,27 @@ export interface McpServerDef {
 export interface Instance {
   id: string;
   label: string;
-  /** 引擎：codex（ChatGPT 桌面客户端 + CLI）或 opencode */
+  /** Engine: codex (ChatGPT desktop app + CLI) or opencode */
   engine?: Engine;
-  /** CODEX_HOME 目录（opencode 实例为其配置目录） */
+  /** CODEX_HOME directory (the config directory for opencode instances) */
   home: string;
-  /** Electron --user-data-dir（桌面客户端隔离 profile）；官方实例不填（复用已登录默认 profile） */
+  /** Electron --user-data-dir (isolated desktop profile); unset for official instances (reuse the signed-in default profile) */
   profile?: string;
-  /** 第三方 provider；缺省 = 官方 OpenAI（ChatGPT 登录） */
+  /** Third-party provider; defaults to official OpenAI (ChatGPT sign-in) */
   provider?: ProviderConfig;
   model: string;
-  /** 可选模型池（多选配置），model 为当前激活项 */
+  /** Optional model pool (multi-select config); model is the currently active one */
   models?: string[];
-  /** 创建时使用的预设 key（zen/go/deepseek），用于面板回显模型池 */
+  /** Preset key used at creation time (zen/go/deepseek), for echoing the model pool in the panel */
   preset?: string;
-  /** models.json 模型目录路径 */
+  /** Path to the models.json catalog */
   modelCatalog?: string;
   reasoningEffort?: string;
   preferredAuthMethod?: "apikey" | "chatgpt";
   surfaces: Surface[];
-  /** 克隆时继承的项目信任（projects.*.trust_level） */
+  /** Project trust inherited on clone (projects.*.trust_level) */
   trustProjects?: string[];
-  /** 克隆时继承的非系统 MCP server */
+  /** Non-system MCP servers inherited on clone */
   mcpServers?: McpServerDef[];
   inheritFrom?: string;
   createdAt: string;
@@ -53,7 +53,7 @@ export interface RunningProc {
   surface: Surface;
   pid: number;
   startedAt: string;
-  /** 进程指纹（创建时间+命令行摘要），防止 PID 复用误判 */
+  /** Process fingerprint (start time + command-line digest) to avoid PID-reuse misjudgment */
   fingerprint?: string;
 }
 

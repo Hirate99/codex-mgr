@@ -1,6 +1,6 @@
 {
   "name": "codex-mgr",
-  "description": "多开 ChatGPT/Codex 桌面客户端与 CLI 的本地实例管理器",
+  "description": "Local instance manager for running multiple ChatGPT/Codex desktop apps and CLIs",
   "version": "0.1.0",
   "private": true,
   "type": "module",

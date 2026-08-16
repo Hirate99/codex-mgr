@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { Registry } from "../src/registry";
 
 describe("Registry", () => {
-  test("CRUD 与运行状态（内存态不落盘）", () => {
+  test("CRUD and runtime state (in-memory only)", () => {
     const dir = mkdtempSync(join(tmpdir(), "cxm-reg-"));
     const r = new Registry(dir);
 

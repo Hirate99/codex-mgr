@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "./proc";
 
 const isWin = process.platform === "win32";
 const isMac = process.platform === "darwin";
@@ -11,12 +11,12 @@ export function homeDir(): string {
   return process.env.USERPROFILE ?? process.env.HOME ?? ".";
 }
 
-/** 当前用户的官方 codex home（通常已登录） */
+/** The current user's official Codex home (usually signed in) */
 export function defaultCodexHome(): string {
   return join(homeDir(), ".codex");
 }
 
-/** codex-mgr 自身状态目录 */
+/** codex-mgr's own state directory */
 export function mgrRoot(): string {
   return join(homeDir(), ".codex-mgr");
 }
@@ -29,17 +29,17 @@ export function envFilePath(): string {
   return join(mgrRoot(), ".env");
 }
 
-/** 面板后台运行状态文件 */
+/** Panel background state file */
 export function panelStatePath(): string {
   return join(mgrRoot(), "panel-state.json");
 }
 
-/** 面板后台运行日志 */
+/** Panel background log */
 export function panelLogPath(): string {
   return join(mgrRoot(), "panel.log");
 }
 
-/** 实例根目录：每个第三方实例一个独立 CODEX_HOME */
+/** Instances root: one dedicated CODEX_HOME per third-party instance */
 export function instancesRoot(): string {
   return join(homeDir(), ".codex-instances");
 }
@@ -52,7 +52,7 @@ export function instanceProfileDir(id: string): string {
   return join(instancesRoot(), id, ".desktop-profile");
 }
 
-/** Electron 默认 profile（官方已登录实例） */
+/** Default Electron profile (official signed-in instance) */
 export function defaultDesktopProfile(): string {
   if (isWin) return join(process.env.APPDATA ?? "", "Codex", "web", "Codex");
   if (isMac)
@@ -67,13 +67,13 @@ export function defaultDesktopProfile(): string {
   return join(homeDir(), ".config", "Codex", "web", "Codex");
 }
 
-/** 桌面客户端候选路径（按优先级探测） */
+/** Desktop app candidate paths (probed in priority order) */
 export function desktopAppCandidates(): string[] {
   if (isWin) {
     return [
-      // MSIX 包内 ChatGPT.exe，优先找最新版本
+      // ChatGPT.exe inside the MSIX package; prefer the newest version
       ...findWindowsAppsCodex(),
-      // 独立安装的 Codex 桌面版
+      // Standalone Codex desktop install
       join(
         process.env.LOCALAPPDATA ?? "",
         "Programs",

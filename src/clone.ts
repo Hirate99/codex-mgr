@@ -194,11 +194,12 @@ export function renderInstanceConfig(input: ConfigureInput): ConfigureResult {
     if (p.envKey) def.env_key = p.envKey;
     doc.model_providers = { ...(doc.model_providers ?? {}), [p.id]: def };
 
-    // 第三方实例不要继承官方配置里的 elevated 沙箱：Windows 下需要 UAC 提权安装
-    // 低权限沙箱用户，失败时会反复弹窗并报"找不到指定文件"。
-    // 注意 [windows] sandbox 只接受 "elevated" / "unelevated"（"workspace-write"
-    // 是 macOS/Linux 的值，写进 Windows 配置会导致整个 config.toml 解析失败，
-    // 桌面客户端读不到 provider/env_key 而退回登录界面）。
+    // Third-party instances must not inherit the elevated sandbox from the official config:
+    // on Windows it needs UAC elevation to install low-privilege sandbox users, and failures
+    // repeatedly pop up dialogs and report "file not found".
+    // Note that [windows] sandbox only accepts "elevated" / "unelevated"; "workspace-write"
+    // is a macOS/Linux value, and writing it into a Windows config makes the whole
+    // config.toml fail to parse, so the desktop app falls back to the login screen.
     if (
       doc.windows &&
       typeof doc.windows === "object" &&
@@ -218,7 +219,7 @@ export function renderInstanceConfig(input: ConfigureInput): ConfigureResult {
   return { toml, changes, warnings };
 }
 
-// ---------- 实例创建 / 模型切换 ----------
+// ---------- Instance creation / model switching ----------
 
 export interface CloneInput {
   id: string;

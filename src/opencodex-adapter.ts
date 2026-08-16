@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "./proc";
 import { killProcessTree } from "./probe";
 
 const DEFAULT_PORT = 10100;
@@ -29,7 +29,7 @@ function command(): [string, string] | undefined {
   return [process.execPath, bin];
 }
 
-/** opencodex 管理 API 的 admin token：优先环境变量，否则读 ~/.opencodex/admin-api-token。 */
+/** Admin token for the opencodex management API: env var first, otherwise ~/.opencodex/admin-api-token. */
 function adminToken(): string | undefined {
   const fromEnv = process.env.OPENCODEX_ADMIN_AUTH_TOKEN?.trim();
   if (fromEnv) return fromEnv;
@@ -122,8 +122,9 @@ export async function startOpencodex(port = DEFAULT_PORT, _apiKey?: string): Pro
 }
 
 /**
- * 通过 opencodex 的本地管理 API 写入 provider（POST /api/providers 会同时持久化并热更新），
- * 不再走 `ocx provider add` + `ocx restart`（restart 会再次注入默认 Codex 配置）。
+ * Configure the provider through opencodex's local management API (POST /api/providers
+ * persists and hot-reloads), instead of `ocx provider add` + `ocx restart`
+ * (restart re-injects the default Codex config).
  */
 export async function stopOpencodex(): Promise<{ ok: boolean; error?: string }> {
   const status = await opencodexStatus();

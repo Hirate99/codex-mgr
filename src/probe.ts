@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import {
   codexCliCandidates,
   defaultCodexHome,
@@ -8,6 +7,7 @@ import {
   opencodeCliCandidates,
   platform,
 } from "./paths";
+import { spawnSync } from "./proc";
 
 export interface ProbeResult {
   platform: string;
@@ -57,7 +57,7 @@ export function probe(): ProbeResult {
   return out;
 }
 
-/** 列出当前运行的桌面客户端主进程（不含 --type 子进程） */
+/** List running desktop-app main processes (excluding --type child processes) */
 export function runningDesktopProcesses(): {
   pid: number;
   cmd: string;
@@ -96,7 +96,7 @@ export function runningDesktopProcesses(): {
         { encoding: "utf8" },
       );
       const lines = (r.stdout ?? "").trim().split("\n").filter(Boolean);
-      return lines.map((l) => {
+      return lines.map((l: string) => {
         const m = l.match(/^\s*(\d+)\s+(.*)$/);
         const cmd = m?.[2] ?? "";
         const ud = cmd.match(/--user-data-dir="?([^"\s]+)"?/);

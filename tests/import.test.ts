@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { importCodexConfig } from "../src/import";
 
 describe("importCodexConfig", () => {
-  test("解析 model/provider/信任项目/MCP，跳过系统 node_repl", () => {
+  test("parses model/provider/trusted projects/MCP and skips the system node_repl", () => {
     const dir = mkdtempSync(join(tmpdir(), "cxm-import-"));
     writeFileSync(
       join(dir, "config.toml"),
@@ -39,7 +39,7 @@ describe("importCodexConfig", () => {
     expect(out.providers).toContain("deepseek");
   });
 
-  test("缺失配置文件时返回空结构", () => {
+  test("returns an empty structure when the config file is missing", () => {
     const dir = mkdtempSync(join(tmpdir(), "cxm-import-empty-"));
     const out = importCodexConfig(dir);
     expect(out.model).toBeUndefined();

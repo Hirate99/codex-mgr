@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
 import { platform } from "./paths";
+import { spawnSync } from "./proc";
 import { isPidAlive, killProcessTree, runningDesktopProcesses } from "./probe";
 import type { Instance, RunningProc, Surface } from "./types";
 

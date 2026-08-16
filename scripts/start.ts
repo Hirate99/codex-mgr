@@ -6,7 +6,8 @@ import { loadSecrets } from "../src/secrets";
 import { panelLogPath, panelStatePath } from "../src/paths";
 
 
-// 尽早注册信号处理。OpenCodex 是独立 detached 进程，面板退出时不得连带停止它。
+// Register signal handling early. OpenCodex is an independent detached process and
+// must not be stopped together with the panel.
 let shuttingDown = false;
 let panelServer: { stop: (force?: boolean) => void } | undefined;
 
@@ -14,17 +15,17 @@ function shutdown(signal: string): void {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`收到 ${signal}，正在退出面板…`);
-  // 兜底：若优雅停止被挂起，1.5s 后强制退出。
+  // Fallback: force-exit after 1.5s if graceful shutdown hangs.
   setTimeout(() => process.exit(0), 1500).unref();
   try {
     panelServer?.stop(true);
   } catch {
-    /* 面板可能尚未启动 */
+    /* The panel may not have started yet */
   }
   try {
     if (existsSync(panelStatePath())) writeFileSync(panelStatePath(), "", "utf8");
   } catch {
-    /* 状态文件清理是 best effort */
+    /* State-file cleanup is best effort */
   }
   process.exit(0);
 }
@@ -34,11 +35,11 @@ process.on("SIGTERM", () => shutdown("SIGTERM"));
 try {
   process.on("SIGBREAK", () => shutdown("SIGBREAK"));
 } catch {
-  /* 不支持该信号的环境忽略 */
+  /* Ignored on platforms that do not support this signal */
 }
 
 const startupSecrets = loadSecrets();
-// 并发拉起 opencodex，不阻塞面板服务启动
+// Start opencodex concurrently without blocking panel startup
 void startOpencodex(
   undefined,
   startupSecrets["OPENCODE_GO_API_KEY"] ?? startupSecrets["OPENCODE_API_KEY"],
@@ -58,8 +59,8 @@ if (!existsSync(SERVER_ENTRY)) {
   process.exit(1);
 }
 
-// 构建产物里的虚拟模块（#tanstack-router-entry 等）已被 Vite 内联，
-// 直接在 Bun 里加载即可，不再依赖 @tanstack/react-start/server-entry。
+// Virtual modules in the build output (#tanstack-router-entry etc.) are already inlined
+// by Vite; load them directly in Bun without depending on @tanstack/react-start/server-entry.
 const serverEntry = await import(`file://${SERVER_ENTRY.replace(/\\/g, "/")}`);
 const startHandler = serverEntry.default as { fetch: (request: Request) => Promise<Response> };
 

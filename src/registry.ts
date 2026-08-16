@@ -25,7 +25,7 @@ export class Registry {
         return parsed;
       }
     } catch {
-      // 首次运行或文件损坏，重建
+      // Rebuild on first run or when the file is corrupted
     }
     this.ignored = new Set();
     return { version: 1, instances: [] };
@@ -68,7 +68,7 @@ export class Registry {
     return this.ignored.has(id);
   }
 
-  // ---- 运行时状态（仅内存，不落盘，避免 PID 复用误判） ----
+  // ---- Runtime state (memory-only, never persisted, to avoid PID-reuse misjudgment) ----
 
   setProc(proc: RunningProc): void {
     this.procs.set(`${proc.instanceId}:${proc.surface}`, proc);

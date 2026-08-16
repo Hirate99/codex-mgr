@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { renderInstanceConfig, createInstance, switchInstanceModel } from "../src/clone";
 
 describe("renderInstanceConfig", () => {
-  test("基于基础配置生成 DeepSeek 配置：保留其余内容、移除冲突键、重写 provider", () => {
+  test("generates a DeepSeek config from the base config: keeps the rest, removes conflicting keys, rewrites the provider", () => {
     const base = mkdtempSync(join(tmpdir(), "cxm-cfg-"));
     const baseToml = join(base, "base.toml");
     writeFileSync(
@@ -67,7 +67,7 @@ describe("renderInstanceConfig", () => {
     expect(r.changes.length).toBeGreaterThan(0);
   });
 
-  test("官方配置（无 provider）不写入 apikey 字段", () => {
+  test("official config (no provider) does not write the apikey field", () => {
     const r = renderInstanceConfig({ model: "gpt-5.6-sol" });
     const parsed = Bun.TOML.parse(r.toml) as any;
     expect(parsed.model).toBe("gpt-5.6-sol");
@@ -75,7 +75,7 @@ describe("renderInstanceConfig", () => {
     expect(parsed.model_providers).toBeUndefined();
   });
 
-  test("第三方实例不继承 elevated 沙箱（避免 UAC 弹窗）", () => {
+  test("third-party instances do not inherit the elevated sandbox (avoid UAC pop-ups)", () => {
     const base = mkdtempSync(join(tmpdir(), "cxm-sandbox-"));
     const baseToml = join(base, "base.toml");
     writeFileSync(
@@ -108,7 +108,7 @@ describe("renderInstanceConfig", () => {
 });
 
 describe("createInstance", () => {
-  test("DeepSeek 预设：写入 config.toml + models.json，不复制 auth.json，备份目录存在", () => {
+  test("DeepSeek preset: writes config.toml + models.json, does not copy auth.json, backup directory exists", () => {
     const base = mkdtempSync(join(tmpdir(), "cxm-clone-"));
     const home = join(base, "deepseek");
     const out = createInstance(
@@ -140,7 +140,7 @@ describe("createInstance", () => {
     expect(slugs).toContain("deepseek-v4-flash");
   });
 
-  test("模型切换只改 model 并保留其它配置", () => {
+  test("model switching only changes model and keeps other config", () => {
     const base = mkdtempSync(join(tmpdir(), "cxm-switch-"));
     const home = join(base, "deepseek");
     createInstance(

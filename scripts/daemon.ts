@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
-import { spawn, spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { mkdirSync, openSync, rmSync } from "node:fs";
 import { mgrRoot, panelLogPath, panelStatePath } from "../src/paths";
+import { spawn, spawnSync } from "../src/proc";
 
 interface PanelState {
   version: 1;

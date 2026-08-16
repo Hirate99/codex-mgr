@@ -1,10 +1,10 @@
 import { copyFileSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";
-import { spawn, spawnSync } from "node:child_process";
 import type { Instance, RunningProc, Surface } from "./types";
 import { mgrRoot } from "./paths";
 import { platform } from "./paths";
 import { ensureModelCatalogCompatibility } from "./clone";
+import { spawn, spawnSync } from "./proc";
 
 export interface LaunchTarget {
   desktopAppPath?: string;
