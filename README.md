@@ -4,6 +4,8 @@
 
 It is designed for local use and listens on `127.0.0.1` by default.
 
+![codex-mgr console](docs/screenshot.png)
+
 ## Features
 
 - Auto-detects the local Codex CLI, OpenCode CLI, and Codex desktop app
